@@ -1,0 +1,29 @@
+.post-create-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+}
+
+.temp-save-btn {
+  flex: 1;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  color: #666;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.submit-btn {
+  flex: 1;
+  padding: 15px;
+  background-color: #8b7355; /* 갈색 배경 */
+  border: none;
+  color: white;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}

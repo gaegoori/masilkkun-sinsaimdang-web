@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom"; // 👈 useNavigate 추가
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { CategoryProvider } from "./context/CategoryContext";
 import Sidebar from "./components/layout/Sidebar";
 import PostListPage from "./pages/PostListPage";
 import PostCreatePage from "./pages/PostCreatePage";
+import PostEditPage from "./pages/PostEditPage"; // 👈 새로 추가된 import
 import PostCoursePage from "./pages/PostCoursePage";
 import CertificationPage from "./pages/CertificationPage";
 import ScrapbookPage from "./pages/ScrapbookPage";
@@ -21,7 +22,7 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const mapRef = useRef(null); // Mapview ref
-  const navigate = useNavigate(); // 👈 useNavigate 선언
+  const navigate = useNavigate();
 
   const handleSelectPlace = (selectedPlace) => {
     // PostCreatePage에서 사용할 콜백
@@ -40,7 +41,7 @@ const App = () => {
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
     setIsLoginModalOpen(false);
-    navigate("/postlist"); // 👈 페이지 이동 로직 추가
+    navigate("/postlist");
   };
 
   const handleLogout = () => {
@@ -59,7 +60,7 @@ const App = () => {
               isLoggedIn={isLoggedIn}
               setIsLoginModalOpen={setIsLoginModalOpen}
               setIsLoggedIn={setIsLoggedIn}
-              onLogout={handleLogout} // 👈 로그아웃 핸들러를 전달합니다.
+              onLogout={handleLogout}
             />
           </div>
           <div className="content-wrapper">
@@ -80,6 +81,11 @@ const App = () => {
               <Route
                 path="create"
                 element={<PostCreatePage mapRef={mapRef} />}
+              />
+              {/* 👇 새로 추가된 수정 페이지 라우트 */}
+              <Route
+                path="edit/:id"
+                element={<PostEditPage mapRef={mapRef} />}
               />
               <Route
                 path="post/:id"

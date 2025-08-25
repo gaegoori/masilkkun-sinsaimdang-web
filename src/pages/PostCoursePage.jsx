@@ -1,7 +1,7 @@
 // src/pages/PostCoursePage.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FaHeart, FaBookmark, FaArrowLeft } from "react-icons/fa";
+import { FaHeart, FaBookmark, FaArrowLeft, FaEdit } from "react-icons/fa";
 import "./PostCoursePage.css";
 import baseApi from "../api/baseApi";
 import Mapview from "../components/main/Mapview";
@@ -11,11 +11,15 @@ const TAG_LABELS = {
   RESTAURANT: "맛집",
   TRAVEL_SPOT: "여행지",
 };
+
+const ACTIONS_KEY = "articleActions";
+
 const patchArticleCache = (articleId, patch) => {
   const map = readActions();
   map[String(articleId)] = { ...(map[String(articleId)] || {}), ...patch };
   writeActions(map);
 };
+
 const readActions = () => {
   try {
     return JSON.parse(sessionStorage.getItem(ACTIONS_KEY) || "{}");
@@ -29,16 +33,25 @@ const writeActions = (obj) => {
     sessionStorage.setItem(ACTIONS_KEY, JSON.stringify(obj));
   } catch {}
 };
+
 const PostCoursePage = ({ mapRef }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isScraped, setIsScraped] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [scrapCount, setScrapCount] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    region: "",
+    tags: [],
+    places: [],
+  });
 
   const handleGoBack = () => navigate(-1);
 
@@ -51,6 +64,92 @@ const PostCoursePage = ({ mapRef }) => {
       return null;
     }
     return token;
+  };
+
+  // 현재 사용자가 작성자인지 확인
+  const isAuthor =
+    currentUser &&
+    post &&
+    (currentUser.id === post.authorId ||
+      currentUser.id === post.author?.id ||
+      currentUser.id === post.userId);
+
+  // 수정 페이지로 이동
+  const handleEditClick = () => {
+    navigate(`/edit/${id}`);
+  };
+
+  // 수정 모달 닫기
+  const handleEditClose = () => {
+    setIsEditing(false);
+    setEditForm({
+      title: "",
+      region: "",
+      tags: [],
+      places: [],
+    });
+  };
+
+  // 게시글 수정 저장
+  const handleEditSave = async () => {
+    const token = ensureToken();
+    if (!token) return;
+
+    try {
+      setLoading(true);
+
+      const updateData = {
+        title: editForm.title,
+        region: editForm.region,
+        tags: editForm.tags,
+        places: editForm.places,
+      };
+
+      const response = await baseApi.put(`/articles/${id}`, updateData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.data?.success || response.status === 200) {
+        const updatedPost = response.data?.data || response.data;
+        setPost((prev) => ({
+          ...prev,
+          ...updatedPost,
+        }));
+        setIsEditing(false);
+        alert("게시글이 수정되었습니다.");
+      }
+    } catch (error) {
+      console.error("게시글 수정 실패:", error);
+      if (error.response?.status === 403) {
+        alert("본인이 작성한 게시글만 수정할 수 있습니다.");
+      } else {
+        alert("게시글 수정에 실패했습니다.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 폼 입력 핸들러
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // 태그 토글 핸들러
+  const handleTagToggle = (tag) => {
+    setEditForm((prev) => ({
+      ...prev,
+      tags: prev.tags.includes(tag)
+        ? prev.tags.filter((t) => t !== tag)
+        : [...prev.tags, tag],
+    }));
   };
 
   // 좋아요 토글: "숫자 변화 ↔ 색" 동기화
@@ -223,8 +322,20 @@ const PostCoursePage = ({ mapRef }) => {
           localStorage.getItem("accessToken");
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const res = await baseApi.get(`articles/${id}`, { headers });
-        const postData = res.data?.data;
+        // 게시글과 사용자 정보를 동시에 로드
+        const [postResponse, userResponse] = await Promise.all([
+          baseApi.get(`articles/${id}`, { headers }),
+          token
+            ? baseApi.get("/user/me", { headers }).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+
+        const postData = postResponse.data?.data;
+        const userData = userResponse?.data?.data || userResponse?.data;
+
+        if (userData) {
+          setCurrentUser(userData);
+        }
 
         const like0 = Number(postData?.likeCount || 0);
         const scrap0 = Number(postData?.scrapCount || 0);
@@ -323,16 +434,30 @@ const PostCoursePage = ({ mapRef }) => {
         </div>
       </div>
 
-      <div className="tags">
-        {post.tags?.map((tag, i) => {
-          const value = tag.replace(/^#/, ""); // '#' 있으면 제거
-          const label = TAG_LABELS[value] || value; // 매핑 없으면 원래 값
-          return (
-            <button key={i} className="tag-btn">
-              #{label}
-            </button>
-          );
-        })}
+      {/* 태그와 수정 버튼 영역 */}
+      <div className="tags-section">
+        <div className="tags">
+          {post.tags?.map((tag, i) => {
+            const value = tag.replace(/^#/, ""); // '#' 있으면 제거
+            const label = TAG_LABELS[value] || value; // 매핑 없으면 원래 값
+            return (
+              <button key={i} className="tag-btn">
+                #{label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 수정 버튼 - 작성자에게만 표시 */}
+        {isAuthor && (
+          <button
+            className="edit-btn-small"
+            onClick={handleEditClick}
+            title="게시글 수정"
+          >
+            <FaEdit />
+          </button>
+        )}
       </div>
 
       <div className="course-summary">
@@ -369,6 +494,9 @@ const PostCoursePage = ({ mapRef }) => {
           </div>
         ))}
       </div>
+
+      {/* 수정 모달 제거 - 이제 별도 페이지로 이동 */}
+
       <Mapview ref={mapRef} />
     </div>
   );

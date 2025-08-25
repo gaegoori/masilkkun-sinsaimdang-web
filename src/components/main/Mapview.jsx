@@ -8,10 +8,60 @@ import React, {
 import { useLocation } from "react-router-dom";
 import "./Mapview.css";
 
+export let mapInstanceRefGlobal = null;
+
+// Mapview 외부에서 호출할 수 있는 초기 지도 생성
+export const initMapRoute = () => {
+  if (!window.kakao) return;
+  const container = document.createElement("div");
+  container.style.width = "0px";
+  container.style.height = "0px";
+  document.body.appendChild(container);
+
+  const map = new window.kakao.maps.Map(container, {
+    center: new window.kakao.maps.LatLng(37.566826, 126.9786567),
+    level: 3,
+  });
+
+  mapInstanceRefGlobal = map;
+};
+
+// Mapview 외부에서 길찾기 호출
+export const getRoute = async (routePlaces) => {
+  if (!routePlaces?.length || !window.kakao || !mapInstanceRefGlobal) return;
+
+  const start = routePlaces[0];
+  const end = routePlaces[routePlaces.length - 1];
+  const waypoints = routePlaces
+    .slice(1, -1)
+    .map((p) => `${p.lng},${p.lat}`)
+    .join("|");
+
+  const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${start.lng},${start.lat}&destination=${end.lng},${end.lat}&waypoints=${waypoints}&priority=RECOMMEND&alternatives=false`;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url, true);
+    xhr.setRequestHeader(
+      "Authorization",
+      `KakaoAK ${import.meta.env.VITE_REST_API}`
+    );
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === 4) {
+        if (xhr.status === 200) {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data);
+        } else reject(xhr.status);
+      }
+    };
+    xhr.send();
+  });
+};
+
 const Mapview = forwardRef(({ onSelectPlace }, ref) => {
   const location = useLocation();
   const isMyPage = location.pathname === "/mypage";
-  const isPostPage = location.pathname.includes("/create");
+  const isCreatePage = location.pathname.includes("/create");
 
   const [showSearch, setShowSearch] = useState(false);
   const mapRef = useRef(null);
@@ -23,11 +73,110 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
   const mapInstanceRef = useRef(null);
   const [onSelectPlaceCallback, setOnSelectPlaceCallback] = useState(null);
 
-  // 부모 컴포넌트에서 호출 가능
+  const waitForMap = () =>
+    new Promise((resolve) => {
+      const check = () => {
+        if (mapInstanceRef.current) resolve();
+        else setTimeout(check, 50);
+      };
+      check();
+    });
+
   useImperativeHandle(ref, () => ({
     openSearch: () => setShowSearch(true),
     closeSearch: () => setShowSearch(false),
     setOnSelectPlace: (callback) => setOnSelectPlaceCallback(() => callback),
+    getRoute: async (routePlaces) => {
+      await waitForMap();
+      if (!routePlaces?.length || !window.kakao || !mapInstanceRef.current)
+        return;
+
+      const firstPlace = routePlaces[0];
+      if (firstPlace) {
+        mapInstanceRef.current.setCenter(
+          new window.kakao.maps.LatLng(firstPlace.lat, firstPlace.lng)
+        );
+      }
+
+      const start = routePlaces[0];
+      const end = routePlaces[routePlaces.length - 1];
+      const waypoints = routePlaces
+        .slice(1, -1)
+        .map((p) => `${p.lng},${p.lat}`)
+        .join("|");
+
+      const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${start.lng},${start.lat}&destination=${end.lng},${end.lat}&waypoints=${waypoints}&priority=RECOMMEND&alternatives=false`;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.setRequestHeader(
+        "Authorization",
+        `KakaoAK ${import.meta.env.VITE_REST_API}`
+      );
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          const data = JSON.parse(xhr.responseText);
+          if (!data.routes?.length) return;
+
+          const section = data.routes[0].sections?.[0] || data.routes[0];
+
+          // guides 배열에서 좌표 추출
+          const linePath =
+            section.guides?.map(
+              (g) => new window.kakao.maps.LatLng(g.y, g.x)
+            ) || [];
+
+          if (!linePath.length) return;
+
+          if (mapInstanceRef.current.polyline) {
+            mapInstanceRef.current.polyline.setMap(null);
+          }
+
+          const polyline = new window.kakao.maps.Polyline({
+            map: mapInstanceRef.current,
+            path: linePath,
+            strokeWeight: 5,
+            strokeColor: "#FF0000",
+            strokeOpacity: 0.7,
+            strokeStyle: "solid",
+          });
+
+          const bounds = new window.kakao.maps.LatLngBounds();
+          linePath.forEach((latlng) => bounds.extend(latlng));
+          mapInstanceRef.current.setBounds(bounds);
+
+          mapInstanceRef.current.polyline = polyline;
+          if (markersRef.current?.length) {
+            markersRef.current.forEach((m) => m.setMap(null));
+          }
+          // 🚀 사용자 제공 장소에만 마커 찍기
+          markersRef.current = routePlaces.map((place) => {
+            const position = new window.kakao.maps.LatLng(place.lat, place.lng);
+            const marker = new window.kakao.maps.Marker({
+              position,
+              map: mapInstanceRef.current,
+              title: place.placeName || place.name,
+            });
+
+            const infowindow = new window.kakao.maps.InfoWindow({
+              content: `<div style="padding:5px;">${
+                place.placeName || place.name
+              }</div>`,
+            });
+
+            window.kakao.maps.event.addListener(marker, "click", () => {
+              infowindow.open(mapInstanceRef.current, marker);
+            });
+
+            bounds.extend(position);
+            return marker;
+          });
+
+          mapInstanceRef.current.setBounds(bounds);
+        }
+      };
+      xhr.send();
+    },
   }));
 
   const handlePlaceClick = (place) => {
@@ -131,15 +280,11 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
           mapInstanceRef.current.setLevel(3, { animate: true });
           mapInstanceRef.current.panTo(firstPosition);
         }
-      } else if (status === window.kakao.maps.services.Status.ZERO_RESULT) {
-        alert("검색 결과가 없습니다.");
-      } else if (status === window.kakao.maps.services.Status.ERROR) {
-        alert("검색 중 오류가 발생했습니다.");
       }
     });
   };
 
-  // 지도 초기화 + 폴리곤 복원
+  // 지도 초기화 + 폴리곤
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -158,7 +303,6 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
         psRef.current = new kakao.maps.services.Places();
         infowindowRef.current = new kakao.maps.InfoWindow({ zIndex: 1 });
 
-        // 폴리곤 로딩
         let detailMode = false;
         let polygons = [];
         let areas = [];
@@ -178,35 +322,19 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
             const coords = unit.geometry.coordinates[0];
             const name = unit.properties.SIG_KOR_NM;
             const code = unit.properties.SIG_CD;
-            let paths = [];
-
-            if (unit.geometry.type === "Polygon") {
-              paths = unit.geometry.coordinates.map((ring) =>
-                ring.map((coord) => new kakao.maps.LatLng(coord[1], coord[0]))
-              );
-            }
-            // MultiPolygon: [ [ [ [lng, lat], ... ] ], [ [lng, lat], ... ] ]
-            else if (unit.geometry.type === "MultiPolygon") {
-              unit.geometry.coordinates.forEach((polygon) => {
-                polygon.forEach((ring) => {
-                  paths.push(
-                    ring.map(
-                      (coord) => new kakao.maps.LatLng(coord[1], coord[0])
-                    )
-                  );
-                });
-              });
-            }
-
-            return { name, location: code, paths };
+            const path = coords.map(
+              (coord) => new kakao.maps.LatLng(coord[1], coord[0])
+            );
+            return { name, location: code, path };
           });
+
           areas.forEach(drawPolygon);
         }
 
         function drawPolygon(area) {
           const polygon = new kakao.maps.Polygon({
             map,
-            path: area.paths,
+            path: area.path,
             strokeWeight: 2,
             strokeColor: "#004c80",
             strokeOpacity: 0.8,
@@ -229,7 +357,7 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
           loadGeoJson("/json/sido.json");
 
           kakao.maps.event.addListener(map, "zoom_changed", () => {
-            const level = map.getLevel();
+            const level = map.get2Level();
             if (!detailMode && level <= 10) {
               detailMode = true;
               clearPolygons();
@@ -242,7 +370,6 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
           });
         }
 
-        // 컨트롤 UI
         const mapTypeControl = new kakao.maps.MapTypeControl();
         map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
 
@@ -255,7 +382,7 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
 
   return (
     <div className="map_wrap">
-      {isPostPage && showSearch && (
+      {isCreatePage && showSearch && (
         <div id="menu_wrap" className="bg_white">
           <form id="searchForm" onSubmit={(e) => e.preventDefault()}>
             키워드: <input type="text" ref={keywordRef} size="15" />

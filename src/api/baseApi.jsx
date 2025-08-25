@@ -13,28 +13,17 @@ baseApi.interceptors.request.use((config) => {
     sessionStorage.getItem("accessToken") ||
     localStorage.getItem("accessToken");
 
-  console.log(
-    "인터셉터에서 찾은 토큰:",
-    token ? token.substring(0, 20) + "..." : "없음"
-  );
-
   if (token) {
     // JWT 토큰 기본 검증 (점으로 구분된 3부분)
     const isValidJWT = token.split(".").length === 3;
 
     if (isValidJWT) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(
-        "Authorization 헤더 설정됨:",
-        `Bearer ${token.substring(0, 20)}...`
-      );
     } else {
       localStorage.removeItem("accessToken");
       sessionStorage.removeItem("accessToken");
       console.warn("Invalid JWT token removed");
     }
-  } else {
-    console.log("토큰이 없음 - Authorization 헤더 설정 안 함");
   }
 
   return config;

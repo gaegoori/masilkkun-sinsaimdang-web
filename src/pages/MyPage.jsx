@@ -883,12 +883,12 @@ export default function MyPage() {
                 {/* 이미지 섹션 */}
                 <div className="myp-card-images">
                   <img
-                    src={img1}
+                    src={post.places?.[0]?.photoUrl}
                     alt={`${post.title} 이미지 1`}
                     className="myp-card-image"
                   />
                   <img
-                    src={img2}
+                    src={post.places?.[1]?.photoUrl}
                     alt={`${post.title} 이미지 2`}
                     className="myp-card-image"
                   />

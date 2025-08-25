@@ -238,3 +238,9 @@
   color: #444;
   white-space: pre-line;
 }
+/* PostCoursePage.css */
+.post-course-page > .map_wrap {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

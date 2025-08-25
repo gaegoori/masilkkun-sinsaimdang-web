@@ -81,7 +81,10 @@ const App = () => {
                 path="create"
                 element={<PostCreatePage mapRef={mapRef} />}
               />
-              <Route path="post/:id" element={<PostCoursePage />} />
+              <Route
+                path="post/:id"
+                element={<PostCoursePage mapRef={mapRef} />}
+              />
               <Route path="certification" element={<CertificationPage />} />
               <Route path="scrapbook" element={<ScrapbookPage />} />
               <Route path="mypage" element={<MyPage />} />

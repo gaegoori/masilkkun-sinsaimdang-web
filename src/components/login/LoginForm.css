@@ -83,12 +83,6 @@ input {
   cursor: pointer;
 }
 
-.plane-link {
-  text-decoration: none;
-  color: inherit;
-  cursor: default;
-}
-
 .error-message {
   display: flex;
   color: red;

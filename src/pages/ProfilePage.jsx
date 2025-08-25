@@ -518,12 +518,12 @@ export default function ProfilePage() {
               >
                 <div className="profile-card-images">
                   <img
-                    src={img1}
+                    src={post.places?.[0]?.photoUrl}
                     alt={`${post.title} 이미지 1`}
                     className="profile-card-image"
                   />
                   <img
-                    src={img2}
+                    src={post.places?.[1]?.photoUrl}
                     alt={`${post.title} 이미지 2`}
                     className="profile-card-image"
                   />

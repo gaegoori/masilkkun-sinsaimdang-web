@@ -123,15 +123,15 @@ const LoginForm = ({ onSwitch, onLoginSuccess }) => {
               로그인 유지
             </label>
 
-            <button
-              type="button"
-              className="plane-link"
-              onClick={() => {
-                /* TODO: 아이디/비밀번호 찾기 모달/페이지로 연결 */
-              }}
+            <span
+              className="pla-button"
+              role="button"
+              tabIndex={0}
+              onClick={() => {}}
+              onKeyDown={(e) => e.key === "Enter" && onSwitch()}
             >
               아이디/비밀번호 찾기
-            </button>
+            </span>
 
             <span
               className="plain-button"

@@ -4,9 +4,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import { FaHeart, FaBookmark, FaArrowLeft } from "react-icons/fa";
 import "./PostCoursePage.css";
 import baseApi from "../api/baseApi";
+import Mapview from "../components/main/Mapview";
 
-const ACTIONS_KEY = "articleActions"; // { [articleId]: { isLiked, isScraped, likeCount, scrapCount } }
-
+const TAG_LABELS = {
+  CAFE: "카페",
+  RESTAURANT: "맛집",
+  TRAVEL_SPOT: "여행지",
+};
+const patchArticleCache = (articleId, patch) => {
+  const map = readActions();
+  map[String(articleId)] = { ...(map[String(articleId)] || {}), ...patch };
+  writeActions(map);
+};
 const readActions = () => {
   try {
     return JSON.parse(sessionStorage.getItem(ACTIONS_KEY) || "{}");
@@ -20,22 +29,12 @@ const writeActions = (obj) => {
     sessionStorage.setItem(ACTIONS_KEY, JSON.stringify(obj));
   } catch {}
 };
-
-const patchArticleCache = (articleId, patch) => {
-  const map = readActions();
-  map[String(articleId)] = { ...(map[String(articleId)] || {}), ...patch };
-  writeActions(map);
-};
-
-const PostCoursePage = () => {
+const PostCoursePage = ({ mapRef }) => {
   const { id } = useParams();
   const navigate = useNavigate();
-
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // 표시 상태 + 카운트
   const [isLiked, setIsLiked] = useState(false);
   const [isScraped, setIsScraped] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -204,12 +203,21 @@ const PostCoursePage = () => {
     }
   };
 
-  // 상세 조회
+  const getCoordsFromAddress = (address) =>
+    new Promise((resolve, reject) => {
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      geocoder.addressSearch(address, (result, status) => {
+        if (status === window.kakao.maps.services.Status.OK) {
+          const { y: lat, x: lng } = result[0];
+          resolve({ lat: parseFloat(lat), lng: parseFloat(lng) });
+        } else reject(new Error("주소 변환 실패"));
+      });
+    });
+
   useEffect(() => {
-    const fetchPost = async () => {
+    const fetchPostAndRoute = async () => {
       try {
         setLoading(true);
-
         const token =
           sessionStorage.getItem("accessToken") ||
           localStorage.getItem("accessToken");
@@ -217,9 +225,7 @@ const PostCoursePage = () => {
 
         const res = await baseApi.get(`articles/${id}`, { headers });
         const postData = res.data?.data;
-        setPost(postData);
 
-        // 서버 값으로 초기 상태 세팅
         const like0 = Number(postData?.likeCount || 0);
         const scrap0 = Number(postData?.scrapCount || 0);
         const liked0 = !!postData?.isLiked;
@@ -227,14 +233,12 @@ const PostCoursePage = () => {
 
         setLikeCount(like0);
         setScrapCount(scrap0);
-
-        // 숫자와 색을 함께 맞춤: 서버 불리언 우선, 없으면 카운트 기준
         setIsLiked(typeof postData?.isLiked === "boolean" ? liked0 : like0 > 0);
         setIsScraped(
           typeof postData?.isScraped === "boolean" ? scraped0 : scrap0 > 0
         );
 
-        // ✅ 상세 진입 시 캐시 시드 (목록에서도 색 유지)
+        // 캐시 저장
         patchArticleCache(id, {
           isLiked: typeof postData?.isLiked === "boolean" ? liked0 : like0 > 0,
           isScraped:
@@ -242,77 +246,53 @@ const PostCoursePage = () => {
           likeCount: like0,
           scrapCount: scrap0,
         });
-      } catch (err) {
-        if (err.response?.status === 401) {
-          setError("로그인이 필요하거나 권한이 없습니다.");
-        } else if (err.response?.status === 404) {
-          setError("게시글을 찾을 수 없습니다.");
-        } else {
-          setError("게시글을 불러오는 데 실패했습니다.");
+
+        let placesWithCoords = postData.places;
+        if (postData?.places?.length) {
+          placesWithCoords = await Promise.all(
+            postData.places.map(async (p) => {
+              if (!p.address) return p;
+              const geocoder = new window.kakao.maps.services.Geocoder();
+              return new Promise((resolve, reject) => {
+                geocoder.addressSearch(p.address, (result, status) => {
+                  if (status === window.kakao.maps.services.Status.OK) {
+                    const { y: lat, x: lng } = result[0];
+                    resolve({
+                      ...p,
+                      lat: parseFloat(lat),
+                      lng: parseFloat(lng),
+                    });
+                  } else resolve(p); // 주소 변환 실패 시 원래 데이터 유지
+                });
+              });
+            })
+          );
         }
+
+        setPost({ ...postData, places: placesWithCoords });
+
+        // Mapview 준비될 때까지 대기 후 길찾기 호출
+        if (placesWithCoords?.length && mapRef?.current?.getRoute) {
+          await mapRef.current.getRoute(placesWithCoords);
+        }
+      } catch (err) {
+        console.error(err);
+        if (err.response?.status === 401)
+          setError("로그인이 필요하거나 권한이 없습니다.");
+        else if (err.response?.status === 404)
+          setError("게시글을 찾을 수 없습니다.");
+        else setError("게시글을 불러오는 데 실패했습니다.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPost();
-  }, [id]);
+    fetchPostAndRoute();
+  }, [id, mapRef]);
 
-  if (loading) {
-    return (
-      <div className="post-course-page">
-        <button className="back-button" onClick={handleGoBack}>
-          <FaArrowLeft />
-          <span>뒤로가기</span>
-        </button>
-        <div style={{ textAlign: "center", marginTop: 100 }}>
-          <h2>로딩 중...</h2>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="post-course-page">
-        <button className="back-button" onClick={handleGoBack}>
-          <FaArrowLeft />
-          <span>뒤로가기</span>
-        </button>
-        <div style={{ textAlign: "center", marginTop: 100 }}>
-          <h2>{error}</h2>
-          <button
-            onClick={handleGoBack}
-            style={{
-              marginTop: 20,
-              padding: "10px 20px",
-              backgroundColor: "#8B7355",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
-          >
-            뒤로가기
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!post) {
-    return (
-      <div className="post-course-page">
-        <button className="back-button" onClick={handleGoBack}>
-          <FaArrowLeft />
-          <span>뒤로가기</span>
-        </button>
-        <div style={{ textAlign: "center", marginTop: 100 }}>
-          <h2>게시글을 찾을 수 없습니다.</h2>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div>로딩 중...</div>;
+  if (error) return <div>{error}</div>;
+  if (!post) return <div>게시글을 찾을 수 없습니다.</div>;
 
   return (
     <div className="post-course-page">
@@ -344,11 +324,15 @@ const PostCoursePage = () => {
       </div>
 
       <div className="tags">
-        {post.tags?.map((tag, i) => (
-          <button key={i} className="tag-btn">
-            #{tag}
-          </button>
-        ))}
+        {post.tags?.map((tag, i) => {
+          const value = tag.replace(/^#/, ""); // '#' 있으면 제거
+          const label = TAG_LABELS[value] || value; // 매핑 없으면 원래 값
+          return (
+            <button key={i} className="tag-btn">
+              #{label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="course-summary">
@@ -385,6 +369,7 @@ const PostCoursePage = () => {
           </div>
         ))}
       </div>
+      <Mapview ref={mapRef} />
     </div>
   );
 };

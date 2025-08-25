@@ -1,27 +1,45 @@
+/* src/components/post/CategoryFilter.css */
+
+/* 바깥 래퍼: 페이지에서 margin 주기 쉽게 분리 */
+.category-select {
+  width: 100%;
+}
+
+/* 칩 컨테이너: 한 줄 + 가로 스크롤 + 겹침 방지 */
 .category-select-container {
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;
+  flex-wrap: nowrap; /* 한 줄 유지 */
+  overflow-x: auto; /* 넘치면 가로 스크롤 */
+  padding: 4px 2px; /* 스크롤바/겹침 방지 */
+  -webkit-overflow-scrolling: touch;
 }
 
+/* 칩 기본 스타일 */
 .category-select-chip {
-  padding: 8px 16px;
+  padding: 8px 14px;
   border: 1px solid #dee2e6;
-  border-radius: 20px;
-  background: white;
+  border-radius: 9999px;
+  background: #ffffff;
   color: #6c757d;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap; /* 줄바꿈 방지 */
+  flex: 0 0 auto; /* 가로로만 흐르게 */
+  outline: none;
 }
 
-.category-select-chip:hover {
+/* hover/focus 접근성 */
+.category-select-chip:hover,
+.category-select-chip:focus-visible {
   border-color: #9a7937;
+  box-shadow: 0 0 0 3px rgba(154, 121, 55, 0.12);
 }
 
+/* 선택 상태 */
 .category-select-chip.selected {
   background: #9a7937;
-  color: white;
+  color: #ffffff;
   border-color: #9a7937;
 }

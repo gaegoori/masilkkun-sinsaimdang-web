@@ -163,7 +163,7 @@ export default function MyPage() {
       if (type === "followers") {
         endpoint = `/user/${user.id}/followers`;
       } else {
-        endpoint = `/user/${user.id}/following`;
+        endpoint = `/user/${user.id}/followings`;
       }
 
       console.log(`API 호출: ${endpoint}`);
@@ -427,7 +427,7 @@ export default function MyPage() {
     });
   };
 
-  // 게시글 삭제 (에러 처리 개선)
+  // 게시글 삭제 (서버 문제 대응)
   const deletePosts = async () => {
     if (selectedPosts.size === 0) {
       setError("삭제할 게시글을 선택해주세요.");
@@ -445,50 +445,52 @@ export default function MyPage() {
       setError(null);
 
       const ids = Array.from(selectedPosts);
+      console.log("게시글 삭제 시도:", ids);
+
+      // 서버에서 삭제 API가 작동하지 않는 상황 안내
+      setError(
+        `⚠️ 현재 서버에 문제가 있어 게시글 삭제 기능을 사용할 수 없습니다.\n\n` +
+          `개발팀에서 해결 중이니 잠시 후 다시 시도해주세요.\n\n` +
+          `불편을 드려 죄송합니다.`
+      );
+
+      // 삭제 모드 해제 및 선택 초기화
+      setSelectedPosts(new Set());
+      setIsDeleteMode(false);
+
+      /* 
+      // 서버가 수정되면 아래 코드를 다시 활성화하세요
       const deleteResults = [];
-
-      console.log("게시글 삭제 시작:", ids);
-
+      
       // 각 게시글을 개별적으로 삭제 시도
       for (const id of ids) {
         try {
           console.log(`게시글 ${id} 삭제 시도`);
-
+          
           // 다양한 삭제 API 엔드포인트 시도
           let deleteSuccess = false;
           const deleteEndpoints = [
-            `/articles/${id}`, // 기본 엔드포인트
-            `/posts/${id}`, // posts 경로
-            `/user/articles/${id}`, // 사용자 게시글 경로
-            `/user/posts/${id}`, // 사용자 포스트 경로
+            `/articles/${id}`,           // 기본 엔드포인트
+            `/posts/${id}`,              // posts 경로
+            `/user/articles/${id}`,      // 사용자 게시글 경로
+            `/user/posts/${id}`,         // 사용자 포스트 경로
           ];
 
           for (const endpoint of deleteEndpoints) {
             try {
               console.log(`삭제 API 시도: DELETE ${endpoint}`);
               const response = await baseApi.delete(endpoint);
-              console.log(
-                `게시글 ${id} 삭제 성공 (${endpoint}):`,
-                response.data
-              );
+              console.log(`게시글 ${id} 삭제 성공 (${endpoint}):`, response.data);
               deleteSuccess = true;
               deleteResults.push({ id, success: true, endpoint });
               break;
             } catch (deleteError) {
-              console.warn(
-                `삭제 실패 (${endpoint}):`,
-                deleteError.response?.status
-              );
+              console.warn(`삭제 실패 (${endpoint}):`, deleteError.response?.status);
               if (deleteError.response?.status === 404) {
                 // 404는 이미 삭제되었거나 존재하지 않는 게시글
                 console.log(`게시글 ${id}는 이미 존재하지 않습니다.`);
                 deleteSuccess = true;
-                deleteResults.push({
-                  id,
-                  success: true,
-                  endpoint,
-                  note: "already_deleted",
-                });
+                deleteResults.push({ id, success: true, endpoint, note: "already_deleted" });
                 break;
               }
             }
@@ -498,6 +500,7 @@ export default function MyPage() {
             console.error(`게시글 ${id} 삭제 실패: 모든 엔드포인트 시도 실패`);
             deleteResults.push({ id, success: false });
           }
+
         } catch (error) {
           console.error(`게시글 ${id} 삭제 중 예외:`, error);
           deleteResults.push({ id, success: false, error: error.message });
@@ -508,47 +511,46 @@ export default function MyPage() {
 
       // 성공한 게시글들만 UI에서 제거
       const successfulDeletes = deleteResults
-        .filter((result) => result.success)
-        .map((result) => result.id);
+        .filter(result => result.success)
+        .map(result => result.id);
 
       if (successfulDeletes.length > 0) {
-        setPosts((prev) =>
-          prev.filter((p) => !successfulDeletes.includes(p.id))
-        );
-
+        setPosts((prev) => prev.filter((p) => !successfulDeletes.includes(p.id)));
+        
         // 성공한 게시글들을 선택에서 제거
-        setSelectedPosts((prev) => {
+        setSelectedPosts(prev => {
           const newSet = new Set(prev);
-          successfulDeletes.forEach((id) => newSet.delete(id));
+          successfulDeletes.forEach(id => newSet.delete(id));
           return newSet;
         });
       }
 
-      const failedDeletes = deleteResults.filter((result) => !result.success);
-
+      const failedDeletes = deleteResults.filter(result => !result.success);
+      
       if (failedDeletes.length > 0) {
         setError(
           `${successfulDeletes.length}개 게시글은 삭제되었지만, ` +
-            `${failedDeletes.length}개 게시글 삭제에 실패했습니다. ` +
-            `실패한 게시글: ${failedDeletes.map((f) => f.id).join(", ")}`
+          `${failedDeletes.length}개 게시글 삭제에 실패했습니다. ` +
+          `실패한 게시글: ${failedDeletes.map(f => f.id).join(", ")}`
         );
       } else {
         // 모든 게시글이 성공적으로 삭제된 경우
         setSelectedPosts(new Set());
         setIsDeleteMode(false);
-
+        
         if (successfulDeletes.length === 1) {
           // 성공 메시지는 간단하게
           console.log("게시글이 삭제되었습니다.");
         } else {
-          console.log(
-            `${successfulDeletes.length}개의 게시글이 삭제되었습니다.`
-          );
+          console.log(`${successfulDeletes.length}개의 게시글이 삭제되었습니다.`);
         }
       }
+      */
     } catch (e) {
       console.error("게시글 삭제 중 전체 에러:", e);
-      setError("게시글 삭제 중 오류가 발생했습니다. 다시 시도해주세요.");
+      setError(
+        "현재 서버 문제로 게시글 삭제가 불가능합니다. 관리자에게 문의하세요."
+      );
     } finally {
       setLoading(false);
     }

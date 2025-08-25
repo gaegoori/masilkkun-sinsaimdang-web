@@ -32,7 +32,6 @@ export default function MyPage() {
 
         // 사용자 기본 정보 로드
         const userResponse = await baseApi.get("/user/me");
-        console.log("마이페이지 사용자 정보:", userResponse.data);
 
         // API 응답 구조에 따른 유연한 처리
         let userData = null;
@@ -43,8 +42,6 @@ export default function MyPage() {
         } else if (userResponse.data?.nickname) {
           userData = userResponse.data;
         }
-
-        console.log("사용자 데이터:", userData);
 
         if (userData) {
           // 팔로워/팔로잉 숫자 정보 로드
@@ -62,7 +59,6 @@ export default function MyPage() {
               followInfo.followingCount ?? userData.followingCount ?? 0,
           };
 
-          console.log("완성된 사용자 데이터:", completeUserData);
           setUser(completeUserData);
           setEditForm({
             nickname: userData.nickname || userData.name || "",
@@ -74,8 +70,6 @@ export default function MyPage() {
 
         // 사용자 게시글 로드 (올바른 API 사용)
         try {
-          console.log("내가 작성한 게시글 로드 시작");
-
           // 내가 작성한 게시글 가져오기 (스크랩이 아닌)
           let myPostsResponse;
           try {
@@ -83,7 +77,6 @@ export default function MyPage() {
             myPostsResponse = await baseApi.get(
               `/user/${userData.id}/articles`
             );
-            console.log("작성한 게시글 API 성공:", myPostsResponse.data);
           } catch (articlesError) {
             console.warn(
               "작성한 게시글 API 실패, 대체 API 시도:",
@@ -131,7 +124,6 @@ export default function MyPage() {
             (Array.isArray(myPostsResponse.data) && myPostsResponse.data) ||
             [];
 
-          console.log("정규화된 게시글 데이터:", normalizedPosts);
           setPosts(normalizedPosts);
         } catch (postsError) {
           console.error("게시글 로드 실패:", postsError);

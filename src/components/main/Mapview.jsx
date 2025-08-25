@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { useLocation } from "react-router-dom";
 import "./Mapview.css";
+import baseApi from "../../api/baseApi";
 
 export let mapInstanceRefGlobal = null;
 
@@ -58,12 +59,9 @@ export const getRoute = async (routePlaces) => {
   });
 };
 
-const Mapview = forwardRef(({ onSelectPlace }, ref) => {
+const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
   const routeMarkersRef = useRef([]);
   const location = useLocation();
-  const isMyPage = location.pathname === "/mypage";
-  const isCreatePage = location.pathname.includes("/create");
-
   const [showSearch, setShowSearch] = useState(false);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -74,6 +72,17 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
   const mapInstanceRef = useRef(null);
   const [onSelectPlaceCallback, setOnSelectPlaceCallback] = useState(null);
 
+  let pageMode = "default";
+  if (location.pathname.includes("create")) {
+    pageMode = "create"; // 코스 작성할 때
+  } else if (location.pathname.includes("mypage")) {
+    pageMode = "stamp"; // 마이페이지에서 스탬프 지도
+  } else if (
+    location.pathname.includes("post") ||
+    location.pathname.includes("postlist")
+  ) {
+    pageMode = "detail"; // 게시글 상세
+  }
   const waitForMap = () =>
     new Promise((resolve) => {
       const check = () => {
@@ -167,7 +176,7 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
         const bounds = new window.kakao.maps.LatLngBounds();
         path.forEach((p) => bounds.extend(p));
 
-        // ✅ 사용자 제공 장소만 마커 생성
+        // 사용자 제공 장소만 마커 생성
         routeMarkersRef.current = routePlaces.map((place, idx) => {
           const pos = new window.kakao.maps.LatLng(place.lat, place.lng);
           const imageSrc = "/marker2.png"; // public/marker2.png 에 위치해야 함
@@ -320,6 +329,37 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
     });
   };
 
+  const fetchStampData = async () => {
+    try {
+      const token =
+        sessionStorage.getItem("accessToken") ||
+        localStorage.getItem("accessToken");
+      if (!token) return [];
+
+      const res = await baseApi.get("/location/stamp/map", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log("백에서 받아온 스탬프 데이터:", res.data?.data);
+      return res.data?.data || [];
+    } catch (err) {
+      console.error("스탬프 데이터 불러오기 실패:", err);
+      return [];
+    }
+  };
+
+  const getColor = (level) => {
+    switch (level) {
+      case 1:
+        return "#FFCCCC";
+      case 2:
+        return "#FF6666";
+      case 3:
+        return "#CC0000";
+      default:
+        return "#EEEEEE";
+    }
+  };
+
   // 지도 초기화 + 폴리곤
   useEffect(() => {
     if (!mapRef.current) return;
@@ -329,24 +369,46 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
       import.meta.env.VITE_MAP_API
     }&libraries=services&autoload=false`;
     script.onload = () => {
-      window.kakao.maps.load(() => {
+      window.kakao.maps.load(async () => {
         const kakao = window.kakao;
         const map = new kakao.maps.Map(mapRef.current, {
           center: new kakao.maps.LatLng(37.566826, 126.9786567),
-          level: isMyPage ? 13 : 3,
+          level: pageMode === "stamp" ? 13 : 3,
         });
         mapInstanceRef.current = map;
         psRef.current = new kakao.maps.services.Places();
         infowindowRef.current = new kakao.maps.InfoWindow({ zIndex: 1 });
 
-        let detailMode = false;
         let polygons = [];
         let areas = [];
+        let detailMode = false;
+
+        const stampData = await fetchStampData();
 
         function clearPolygons() {
           polygons.forEach((poly) => poly.setMap(null));
           polygons = [];
           areas = [];
+        }
+
+        function getPolygonCentroid(path) {
+          let x = 0,
+            y = 0,
+            signedArea = 0;
+          for (let i = 0; i < path.length; i++) {
+            const xi = path[i].getLng();
+            const yi = path[i].getLat();
+            const xi1 = path[(i + 1) % path.length].getLng();
+            const yi1 = path[(i + 1) % path.length].getLat();
+            const a = xi * yi1 - xi1 * yi;
+            signedArea += a;
+            x += (xi + xi1) * a;
+            y += (yi + yi1) * a;
+          }
+          signedArea *= 0.5;
+          x /= 6 * signedArea;
+          y /= 6 * signedArea;
+          return new kakao.maps.LatLng(y, x);
         }
 
         async function loadGeoJson(path) {
@@ -357,50 +419,82 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
           areas = features.map((unit) => {
             const coords = unit.geometry.coordinates[0];
             const name = unit.properties.SIG_KOR_NM;
-            const code = unit.properties.SIG_CD;
+            if (!coords) return null;
+
             const path = coords.map(
               (coord) => new kakao.maps.LatLng(coord[1], coord[0])
             );
-            return { name, location: code, path };
-          });
 
-          areas.forEach(drawPolygon);
-        }
-
-        function drawPolygon(area) {
-          const polygon = new kakao.maps.Polygon({
-            map,
-            path: area.path,
-            strokeWeight: 2,
-            strokeColor: "#004c80",
-            strokeOpacity: 0.8,
-            fillColor: "#fff",
-            fillOpacity: 0.7,
-          });
-          polygons.push(polygon);
-
-          let isSelected = false;
-          kakao.maps.event.addListener(polygon, "click", () => {
-            isSelected = !isSelected;
-            polygon.setOptions({
-              fillColor: isSelected ? "#FF6347" : "#fff",
+            const polygon = new kakao.maps.Polygon({
+              map,
+              path,
+              strokeWeight: 2,
+              strokeColor: "#004c80",
+              strokeOpacity: 0.8,
+              fillColor: "#fff",
               fillOpacity: 0.7,
             });
+
+            // Centroid 계산
+            const center = getPolygonCentroid(path);
+
+            const label = new kakao.maps.CustomOverlay({
+              position: center,
+              content: `
+      <div style="
+        padding: 4px 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #004c80;
+        background: rgba(255, 255, 255, 0.85);
+        border: 2px solid #004c80;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        pointer-events: none;
+        white-space: nowrap;
+      ">
+        ${name}
+      </div>
+    `,
+              yAnchor: 1,
+            });
+
+            // 마우스 이벤트
+            kakao.maps.event.addListener(polygon, "mouseover", () => {
+              label.setMap(map);
+            });
+            kakao.maps.event.addListener(polygon, "mouseout", () => {
+              label.setMap(null);
+            });
+
+            // 스탬프 색 적용
+            const stamp = stampData.find(
+              (s) => s.region.trim() === name.trim()
+            );
+            if (stamp) {
+              polygon.setOptions({
+                fillColor: getColor(stamp.colorLevel),
+                fillOpacity: 0.7,
+              });
+            }
+
+            polygons.push(polygon);
+            return { name, path, polygon };
           });
         }
 
-        if (isMyPage) {
-          loadGeoJson("/json/sido.json");
+        if (pageMode === "stamp") {
+          await loadGeoJson("/json/sido.json");
 
           kakao.maps.event.addListener(map, "zoom_changed", () => {
-            const level = map.get2Level();
+            const level = map.getLevel();
             if (!detailMode && level <= 10) {
               detailMode = true;
-              clearPolygons();
+
               loadGeoJson("/json/sig.json");
             } else if (detailMode && level > 10) {
               detailMode = false;
-              clearPolygons();
               loadGeoJson("/json/sido.json");
             }
           });
@@ -414,11 +508,11 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
       });
     };
     document.head.appendChild(script);
-  }, [location.pathname]);
+  }, [location.pathname, mode]);
 
   return (
     <div className="map_wrap">
-      {isCreatePage && showSearch && (
+      {pageMode === "create" && showSearch && (
         <div id="menu_wrap" className="bg_white">
           <form id="searchForm" onSubmit={(e) => e.preventDefault()}>
             키워드: <input type="text" ref={keywordRef} size="15" />

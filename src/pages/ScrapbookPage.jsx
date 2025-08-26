@@ -77,7 +77,10 @@ const ScrapbookPage = () => {
     맛집: "RESTAURANT",
     카페: "CAFE",
   };
-
+  const getToken = () =>
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken") ||
+    "";
   const toggleTag = (tag) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
@@ -107,7 +110,6 @@ const ScrapbookPage = () => {
 
         // 지역: 서버 키가 다르면 여기서 교체 (예: params.sido = ...)
         if (region) params.region = REGION_MAP[region] || region;
-        s;
 
         // --- 응답 처리 + 클라이언트 보정 필터 ---
         const serverList =

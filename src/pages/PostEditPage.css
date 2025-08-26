@@ -27,3 +27,28 @@
   font-weight: bold;
   cursor: pointer;
 }
+
+/* ===== PostEditPage 전용: 타이틀은 일반 흐름으로, 스크롤 시 자연스럽게 사라짐 ===== */
+.edit-page-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  line-height: 1.2;
+}
+.post-create-content {
+  padding-top: 0; /* 기존에 헤더 피하려고 넣어둔 값이면 0으로 */
+  margin-top: 20px;
+}
+.place-remove-btn {
+  position: absolute; /* 핵심 */
+  border: none;
+  width: auto;
+  height: auto;
+  padding: 0;
+  line-height: 1;
+}
+
+.place-remove-btn:hover {
+  background: #f7f4ee;
+}

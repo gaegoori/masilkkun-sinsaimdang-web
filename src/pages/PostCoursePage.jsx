@@ -430,7 +430,7 @@ const PostCoursePage = ({ mapRef }) => {
             title="게시글 수정"
             aria-label="게시글 수정"
           >
-            <FaEdit />
+            수정
           </button>
         )}
       </div>

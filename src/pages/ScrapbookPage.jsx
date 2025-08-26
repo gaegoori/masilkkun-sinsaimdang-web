@@ -4,6 +4,8 @@ import Region from "../components/layout/Region";
 import PostList from "../components/post/PostList";
 import baseApi from "../api/baseApi";
 import "./ScrapbookPage.css";
+import CategoryFilter from "../components/post/CategoryFilter";
+
 
 const ScrapbookPage = () => {
   const [region, setRegion] = useState("");
@@ -17,11 +19,6 @@ const ScrapbookPage = () => {
     카페: "CAFE",
   };
 
-  const toggleTag = (tag) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
   // 스크랩한 게시글 목록 조회
   useEffect(() => {
     const fetchScrapedPosts = async () => {
@@ -152,28 +149,20 @@ const ScrapbookPage = () => {
 
       <div className="filter-bar">
         <div className="category-btns">
-          {["여행지", "맛집", "카페"].map((cat) => (
-            <button
-              key={cat}
-              className={`category-btn ${
-                selectedTags.includes(cat) ? "active" : ""
-              }`}
-              onClick={() => toggleTag(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+          <CategoryFilter
+            selectedCategories={selectedTags}
+            onCategoryChange={setSelectedTags}
+          />
 
-        <select
-          className="sort-select"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-        >
-          <option value="기본순">기본순</option>
-          <option value="좋아요순">좋아요순</option>
-        </select>
-      </div>
+          <select
+            className="sort-select"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          >
+            <option value="기본순">기본순</option>
+            <option value="좋아요순">좋아요순</option>
+          </select>
+        </div>
 
       <PostList
         posts={posts}

@@ -70,6 +70,7 @@ export default function MyPage() {
 
         // 사용자 게시글 로드
         try {
+
           let myPostsResponse;
           try {
             // 1차 시도: 작성한 게시글 API

@@ -253,13 +253,6 @@ const PostCreatePage = ({ mapRef }) => {
       </div>
 
       <div className="post-create-footer">
-        <button
-          className="temp-save-btn"
-          onClick={handleTempSave}
-          type="button"
-        >
-          임시저장
-        </button>
         <button className="submit-btn" onClick={handleSubmit} type="button">
           게시
         </button>

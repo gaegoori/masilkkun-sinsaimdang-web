@@ -227,14 +227,6 @@ const PostEditPage = ({ mapRef }) => {
   const handleRemovePlace = (index) =>
     places.length > 1 && setPlaces(places.filter((_, i) => i !== index));
 
-  const handleTempSave = () => {
-    localStorage.setItem(
-      `tempPost_edit_${id}`,
-      JSON.stringify({ title, tags, region, places })
-    );
-    alert("임시 저장되었습니다!");
-  };
-
   const validateForm = () => {
     if (!title.trim()) return alert("제목을 입력해주세요."), false;
     if (tags.length === 0)
@@ -416,20 +408,20 @@ const PostEditPage = ({ mapRef }) => {
 
   if (loading) {
     return (
-      <div className="post-create-container">
+      <div className="post-edit-container">
         <div className="loading-message">게시글을 불러오는 중...</div>
       </div>
     );
   }
 
   return (
-    <div className="post-create-container">
-      <div className="post-create-content">
+    <div className="post-edit-container">
+      <div className="post-edit-content">
         <h3 className="edit-page-title">게시글 수정</h3>
         <input
           type="text"
           placeholder="제목을 입력해주세요."
-          className="post-create-title-input"
+          className="post-edit-title-input"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={100}
@@ -440,7 +432,7 @@ const PostEditPage = ({ mapRef }) => {
           <input value={region} onChange={(e) => setRegion(e.target.value)} />
         </div>
 
-        <div className="tag-select-container">
+        <div className="tag-select-edit-container">
           {tagOptions.map((tag) => (
             <button
               key={tag.value}
@@ -545,7 +537,7 @@ const PostEditPage = ({ mapRef }) => {
         </button>
       </div>
 
-      <div className="post-create-footer">
+      <div className="post-edit-footer">
         <button className="temp-save-btn" onClick={handleCancel} type="button">
           취소
         </button>

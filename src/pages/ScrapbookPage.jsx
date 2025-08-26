@@ -6,7 +6,6 @@ import baseApi from "../api/baseApi";
 import "./ScrapbookPage.css";
 import CategoryFilter from "../components/post/CategoryFilter";
 
-
 const ScrapbookPage = () => {
   const [region, setRegion] = useState("");
   const [sortOrder, setSortOrder] = useState("기본순");
@@ -163,7 +162,7 @@ const ScrapbookPage = () => {
             <option value="좋아요순">좋아요순</option>
           </select>
         </div>
-
+      </div>
       <PostList
         posts={posts}
         region={region}

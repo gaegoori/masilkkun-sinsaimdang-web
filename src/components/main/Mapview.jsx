@@ -77,6 +77,8 @@ const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
     pageMode = "create"; // 코스 작성할 때
   } else if (location.pathname.includes("mypage")) {
     pageMode = "stamp"; // 마이페이지에서 스탬프 지도
+  } else if (location.pathname.includes("edit")) {
+    pageMode = "edit";
   } else if (
     location.pathname.includes("post") ||
     location.pathname.includes("postlist")
@@ -511,7 +513,7 @@ const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
 
   return (
     <div className="map_wrap">
-      {pageMode === "create" && showSearch && (
+      {(pageMode === "create" || "edit") && showSearch && (
         <div id="menu_wrap" className="bg_white">
           <form id="searchForm" onSubmit={(e) => e.preventDefault()}>
             키워드: <input type="text" ref={keywordRef} size="15" />

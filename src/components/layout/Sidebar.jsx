@@ -202,7 +202,11 @@ const Sidebar = ({ isLoggedIn, setIsLoggedIn, setIsLoginModalOpen }) => {
                 objectPosition: "center",
               }}
             />
-            <p className="username login-required">로그인이 필요합니다</p>
+            <p className="username login-required">
+              로그인이
+              <br />
+              필요합니다
+            </p>
           </div>
         )}
 

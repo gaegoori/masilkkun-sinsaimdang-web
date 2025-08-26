@@ -245,7 +245,7 @@ const PostCard = ({ post, onPatch }) => {
   const tagMap = {
     RESTAURANT: "맛집",
     CAFE: "카페",
-    TRAVEL: "여행지",
+    TRAVEL_SPOT: "여행지",
   };
 
   const formatDate = (dateString) => {

@@ -455,7 +455,7 @@ const PostCoursePage = ({ mapRef }) => {
             onClick={handleEditClick}
             title="게시글 수정"
           >
-            <FaEdit />
+            수정
           </button>
         )}
       </div>

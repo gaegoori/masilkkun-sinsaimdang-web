@@ -1,15 +1,14 @@
-// src/pages/ScrapbookPage.jsx
 import { useState, useEffect } from "react";
-import { useCategory } from "../context/CategoryContext";
 import Region from "../components/layout/Region";
 import PostList from "../components/post/PostList";
 import CategoryFilter from "../components/post/CategoryFilter";
-import SortSelector from "../components/post/SortSelector"; // ✅ 추가
+import SortSelector from "../components/post/SortSelector";
 import baseApi from "../api/baseApi";
 import "./ScrapbookPage.css";
 
 const CONTENT_WIDTH = 720; // 지역바/카테고리바/리스트 공통 폭
 
+// 한글/영문 태그 매핑 (정규화에 사용)
 const K2E = { 여행지: "TRAVEL_SPOT", 맛집: "RESTAURANT", 카페: "CAFE" };
 const E2E = {
   TRAVEL_SPOT: "TRAVEL_SPOT",
@@ -17,6 +16,7 @@ const E2E = {
   CAFE: "CAFE",
 };
 
+// 서버 응답의 태그 필드를 표준 코드로 정규화
 function normalizePostTags(post) {
   const raw =
     post?.tags ?? post?.tagList ?? post?.categories ?? post?.category ?? [];
@@ -31,6 +31,7 @@ function normalizePostTags(post) {
     .filter(Boolean);
 }
 
+// 선택된 태그(AND 조건)로 필터
 function matchBySelectedTags(post, selected) {
   if (!selected || selected.length === 0) return true;
   const postTags = normalizePostTags(post);
@@ -40,11 +41,38 @@ function matchBySelectedTags(post, selected) {
   return true;
 }
 
+const SORT_MAP = {
+  기본순: "createdAt,desc",
+  좋아요순: "likeCount,desc",
+};
+
+const REGION_MAP = {
+  서울: "서울특별시",
+  부산: "부산광역시",
+  대구: "대구광역시",
+  인천: "인천광역시",
+  광주: "광주광역시",
+  대전: "대전광역시",
+  울산: "울산광역시",
+  세종: "세종특별자치시",
+  경기: "경기도",
+  강원: "강원특별자치도",
+  충북: "충청북도",
+  충남: "충청남도",
+  전북: "전북특별자치도",
+  전남: "전라남도",
+  경북: "경상북도",
+  경남: "경상남도",
+  제주: "제주특별자치도",
+};
+
 const ScrapbookPage = () => {
-  const [region, setRegion] = useState("");
-  const [sortOrder, setSortOrder] = useState("기본순"); // ✅ 기존 그대로 사용
+
+  const [region, setRegion] = useState(""); // ex) "서울"
+  const [sortOrder, setSortOrder] = useState("기본순");
   const [posts, setPosts] = useState([]);
-  const [selectedTags, setSelectedTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]); // CategoryFilter의 선택 결과 (배열)
+
 
   const tagMap = {
     여행지: "TRAVEL_SPOT",
@@ -67,6 +95,39 @@ const ScrapbookPage = () => {
         return;
       }
       try {
+       // --- 쿼리 파라미터 조립 ---
+        const params = {
+          page: 0,
+          size: 10,
+          sort: SORT_MAP[sortOrder] || "createdAt,desc",
+        };
+
+        // 태그: 1개면 tag, 여러개면 tags(콤마) — 서버가 읽는 포맷 아무거나 한 개만 써도 됨
+        const tagValues = selectedTags.map((t) => t.value).filter(Boolean);
+        if (tagValues.length === 1) params.tag = tagValues[0];
+        else if (tagValues.length > 1) params.tags = tagValues.join(",");
+
+        // 지역: 서버 키가 다르면 여기서 교체 (예: params.sido = ...)
+        if (region) params.region = REGION_MAP[region] || region;
+
+        const res = await baseApi.get("/user/scraps", {
+          headers: { Authorization: `Bearer ${token}` },
+          params,
+        });
+
+        // --- 응답 처리 + 클라이언트 보정 필터 ---
+        const serverList =
+          res.data?.data?.content ??
+          res.data?.content ??
+          res.data?.data ??
+          res.data ??
+          [];
+
+        const arr = Array.isArray(serverList) ? serverList : [];
+        const filtered = arr.filter((p) =>
+          matchBySelectedTags(p, selectedTags)
+        );
+        setPosts(filtered);
         const regionMap = {
           서울: "서울특별시",
           부산: "부산광역시",
@@ -121,9 +182,11 @@ const ScrapbookPage = () => {
       }
     };
 
+    // 선택 태그/지역/정렬이 바뀔 때마다 재조회
     fetchScrapedPosts();
 
   }, [selectedTags, region, sortOrder]);
+
 
 
   const handleScrapToggle = async (articleId, isCurrentlyScraped) => {
@@ -174,7 +237,7 @@ const ScrapbookPage = () => {
         <Region region={region} onChange={setRegion} />
       </div>
 
-      {/* 카테고리 + 정렬 */}
+      {/* 카테고리 칩 + 정렬 */}
       <div
         className="filter-bar"
         style={{
@@ -198,8 +261,10 @@ const ScrapbookPage = () => {
             </button>
           ))}
 
+
         </div>
         {/* ✅ SortSelector 사용 */}
+
         <SortSelector value={sortOrder} onChange={setSortOrder} />
       </div>
       {/* 리스트 */}

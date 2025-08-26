@@ -1,23 +1,17 @@
 .post-create-container {
   min-height: 100vh;
-  background-color: #ffffff;
   display: flex;
   flex-direction: column;
-  padding: 10px;
 }
-
 .post-create-header {
   padding: 4px 0px 4px 0px;
 }
 .post-create-content {
-  flex: 1;
-  padding: 20px 16px;
-  max-width: 600px;
-  margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
+  flex: 1 1 auto;
+  overflow: auto;
+  /* 긴 화면에서 푸터가 겹치지 않도록 여백 */
+  padding-bottom: 80px;
 }
-
 .post-create-title-input {
   width: 100%;
   padding: 16px;

@@ -1,23 +1,55 @@
+// src/pages/PostEditPage.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import "./PostCreatePage.css"; // 똑같은 CSS 사용
+import "./PostCreatePage.css";
 import baseApi from "../api/baseApi";
 
+// 미리보기용: 상대경로 → 절대경로 보정 (이미지 표시 전용)
+const API_BASE = (
+  import.meta.env.VITE_FILE_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  ""
+).replace(/\/$/, "");
+const normalizeImageUrl = (u) => {
+  if (!u) return null;
+  const s = String(u);
+  if (/^(blob:|data:|https?:\/\/)/i.test(s)) return s;
+  return `${API_BASE}/${s.replace(/^\/+/, "")}`;
+};
+
+// 주소 → 지역 추출
+const pickRegionFrom = (roadAddress, addressStr) => {
+  try {
+    if (roadAddress?.region_2depth_name) return roadAddress.region_2depth_name;
+    if (typeof addressStr === "string" && addressStr.trim()) {
+      const parts = addressStr.trim().split(/\s+/);
+      if (parts[1]) return parts[1];
+    }
+  } catch {}
+  return "";
+};
+
 const PostEditPage = ({ mapRef }) => {
-  const { id } = useParams(); // URL에서 게시글 ID 가져오기
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState([]);
+  const [region, setRegion] = useState("");
+
+  // ✅ places에 서버 원문 photoUrl을 별도 보관: photoUrlRaw
   const [places, setPlaces] = useState([
     {
       placeName: "",
       address: null,
       roadAddress: null,
-      image: null,
+      image: null, // 미리보기용 URL(absolute)
+      imageFile: null, // 새로 업로드한 파일(있을 때만)
+      photoUrlRaw: null, // ✅ 서버가 내려준 원문 photoUrl(문자열 그대로)
       description: "",
     },
   ]);
+
   const [activePlaceIndex, setActivePlaceIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
@@ -49,35 +81,21 @@ const PostEditPage = ({ mapRef }) => {
     제주: "제주특별자치도",
   };
 
-  // 기존 게시글 데이터 불러오기
+  // ========= 게시글 로드 =========
   useEffect(() => {
     const loadPostData = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("accessToken");
 
-        if (!token) {
-          alert("로그인이 필요합니다.");
-          navigate("/login");
-          return;
-        }
-
-        // 현재 사용자 정보와 게시글 정보를 동시에 가져오기
         const [userResponse, postResponse] = await Promise.all([
-          baseApi.get("/user/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          baseApi.get(`/articles/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          baseApi.get("/user/me"),
+          baseApi.get(`/articles/${id}`),
         ]);
 
         const userData = userResponse.data?.data || userResponse.data;
         const postData = postResponse.data?.data || postResponse.data;
-
         setCurrentUser(userData);
 
-        // 작성자 권한 확인
         const isAuthor =
           userData &&
           postData &&
@@ -91,108 +109,76 @@ const PostEditPage = ({ mapRef }) => {
           return;
         }
 
-        // 기존 데이터를 폼에 설정
         setTitle(postData.title || "");
+        setRegion(postData.region || "");
 
-        // 태그 데이터 변환 (문자열을 객체로)
+        // 태그
         const formattedTags = (postData.tags || []).map((tag) => {
           const tagObj = tagOptions.find((option) => option.value === tag);
           return tagObj || { label: tag, value: tag };
         });
         setTags(formattedTags);
 
-        // 장소 데이터 변환
-        const formattedPlaces = (postData.places || []).map((place) => ({
-          placeName: place.placeName || "",
-          address: place.address || place.roadAddress?.address_name || null,
-          roadAddress: place.roadAddress || null,
-          image: place.photoUrl || null, // 기존 이미지 URL
-          description: place.description || "",
-          imageFile: null, // 새로 업로드할 파일은 null로 시작
-        }));
+        // ===== 장소 + 이미지 =====
+        const formattedPlaces = (postData.places || []).map((p) => {
+          // ✅ 서버 원문 photoUrl 그대로 보관(문자열 or null)
+          const raw =
+            (Array.isArray(p.photoUrl) ? p.photoUrl[0] : p.photoUrl) || null;
 
-        // 최소 1개 장소는 보장
+          // 미리보기용은 보정해서 절대경로(사용자에게 보여주기 위함)
+          const preview = raw ? normalizeImageUrl(raw) : null;
+
+          return {
+            placeName: p.placeName || "",
+            address: p.address || p.roadAddress?.address_name || null,
+            roadAddress: p.roadAddress || null,
+            image: preview, // 미리보기
+            imageFile: null, // 새 업로드 없으면 null
+            photoUrlRaw: raw, // ✅ 서버 원문 그대로 저장
+            description: p.description || "",
+          };
+        });
+
+        if (!postData.region && formattedPlaces.length) {
+          const r = pickRegionFrom(
+            formattedPlaces[0].roadAddress,
+            formattedPlaces[0].address
+          );
+          setRegion(r || "");
+        }
+
         if (formattedPlaces.length === 0) {
           formattedPlaces.push({
             placeName: "",
             address: null,
             roadAddress: null,
             image: null,
+            imageFile: null,
+            photoUrlRaw: null,
             description: "",
           });
         }
-
         setPlaces(formattedPlaces);
       } catch (error) {
-        console.error("게시글 로드 실패:", error);
-        if (error.response?.status === 404) {
-          alert("게시글을 찾을 수 없습니다.");
-        } else if (error.response?.status === 403) {
-          alert("권한이 없습니다.");
-        } else {
-          alert("게시글을 불러오는데 실패했습니다.");
+        if (error.response?.status === 401) {
+          alert("로그인이 필요합니다.");
+          navigate("/login");
+          return;
         }
+        console.error("게시글 로드 실패:", error);
+        if (error.response?.status === 404) alert("게시글을 찾을 수 없습니다.");
+        else if (error.response?.status === 403) alert("권한이 없습니다.");
+        else alert("게시글을 불러오는데 실패했습니다.");
         navigate(`/post/${id}`);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) {
-      loadPostData();
-    }
+    if (id) loadPostData();
   }, [id, navigate]);
 
-  // Kakao Geocoder 초기화
-  const initGeocoder = () => {
-    return new Promise((resolve, reject) => {
-      if (geocoderRef.current) return resolve(geocoderRef.current);
-      const check = setInterval(() => {
-        if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
-          geocoderRef.current = new window.kakao.maps.services.Geocoder();
-          clearInterval(check);
-          resolve(geocoderRef.current);
-        }
-      }, 100);
-      setTimeout(() => {
-        clearInterval(check);
-        reject(new Error("Kakao Maps 스크립트 로딩 실패"));
-      }, 5000);
-    });
-  };
-
-  // 좌표 → 주소 변환
-  const coordsToAddress = async (lat, lng) => {
-    await initGeocoder();
-    return new Promise((resolve, reject) => {
-      geocoderRef.current.coord2Address(lng, lat, (result, status) => {
-        if (
-          status === window.kakao.maps.services.Status.OK &&
-          result.length > 0
-        ) {
-          const roadAddress = result[0].road_address;
-          const jibunAddress = result[0].address;
-          const address = roadAddress || jibunAddress;
-          if (!address)
-            return reject(new Error("주소 정보를 찾을 수 없습니다."));
-
-          resolve({
-            address_name: address.address_name,
-            region_1depth_name:
-              regionMap[address.region_1depth_name] ||
-              address.region_1depth_name,
-            region_2depth_name: address.region_2depth_name,
-          });
-        } else {
-          reject(
-            new Error("주소 변환에 실패했습니다. (해당 좌표에 주소 없음)")
-          );
-        }
-      });
-    });
-  };
-
-  // 태그 선택 토글
+  // ========= 입력 =========
   const toggleTag = (tag) => {
     setTags((prev) =>
       prev.some((t) => t.value === tag.value)
@@ -201,19 +187,17 @@ const PostEditPage = ({ mapRef }) => {
     );
   };
 
-  // 이미지 업로드
   const handleImageUpload = (index, e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024)
       return alert("파일 크기는 5MB 이하만 가능합니다.");
     const updated = [...places];
-    updated[index].image = URL.createObjectURL(file);
-    updated[index].imageFile = file;
+    updated[index].image = URL.createObjectURL(file); // 미리보기
+    updated[index].imageFile = file; // 전송용 파일
     setPlaces(updated);
   };
 
-  // 장소 이름 / 설명 변경
   const handlePlaceNameChange = (index, value) => {
     const updated = [...places];
     updated[index].placeName = value;
@@ -225,7 +209,6 @@ const PostEditPage = ({ mapRef }) => {
     setPlaces(updated);
   };
 
-  // 장소 추가/삭제
   const handleAddPlace = () =>
     setPlaces([
       ...places,
@@ -234,41 +217,56 @@ const PostEditPage = ({ mapRef }) => {
         address: null,
         roadAddress: null,
         image: null,
+        imageFile: null,
+        photoUrlRaw: null, // ✅
         description: "",
       },
     ]);
+
   const handleRemovePlace = (index) =>
     places.length > 1 && setPlaces(places.filter((_, i) => i !== index));
 
-  // 임시저장
   const handleTempSave = () => {
     localStorage.setItem(
       `tempPost_edit_${id}`,
-      JSON.stringify({ title, tags, places })
+      JSON.stringify({ title, tags, region, places })
     );
     alert("임시 저장되었습니다!");
   };
 
-  // 폼 유효성 체크
   const validateForm = () => {
     if (!title.trim()) return alert("제목을 입력해주세요."), false;
     if (tags.length === 0)
       return alert("최소 하나의 태그를 선택해주세요."), false;
     if (places.some((p) => !p.placeName.trim()))
       return alert("모든 장소의 이름을 입력해주세요."), false;
+
+    const finalRegion =
+      region ||
+      pickRegionFrom(places[0]?.roadAddress, places[0]?.address) ||
+      "";
+    if (!finalRegion) return alert("지역을 확인해주세요."), false;
+
     return true;
   };
 
-  // 수정 완료
+  // ========= 저장 =========
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    try {
-      const postData = {
-        title,
-        content: places.map((p) => p.description).join("\n\n"),
-        tags: tags.map((t) => t.value || t),
-        places: places.map((p, i) => ({
+    const finalRegion =
+      region ||
+      pickRegionFrom(places[0]?.roadAddress, places[0]?.address) ||
+      "";
+
+    // ✅ 핵심: 새 파일이 없는 곳은 서버 원문 photoUrlRaw 를 그대로 photoUrl로 보냄
+    const postDataBase = {
+      title,
+      content: places.map((p) => p.description).join("\n\n"),
+      region: finalRegion,
+      tags: tags.map((t) => t.value || t),
+      places: places.map((p, i) => {
+        const base = {
           placeOrder: i + 1,
           placeName: p.placeName,
           description: p.description,
@@ -277,72 +275,104 @@ const PostEditPage = ({ mapRef }) => {
             region_1depth_name: "",
             region_2depth_name: "",
           },
-        })),
-      };
+        };
+        if (!p.imageFile) {
+          // 서버가 기존 값 유지하도록 정확히 같은 문자열을 보냄
+          if (p.photoUrlRaw) base.photoUrl = p.photoUrlRaw;
+          // 아무 값도 없으면 필드 자체 생략 → 서버 정책에 따라 유지/무시
+        }
+        return base;
+      }),
+    };
 
-      const token = localStorage.getItem("accessToken");
+    const hasNewImages = places.some((p) => p.imageFile);
 
-      // FormData 생성 (새로 업로드된 이미지가 있을 경우에만)
-      const hasNewImages = places.some((p) => p.imageFile);
-
-      let response;
+    try {
       if (hasNewImages) {
-        const formData = new FormData();
-        formData.append(
+        const fd = new FormData();
+        fd.append(
           "request",
-          new Blob([JSON.stringify(postData)], { type: "application/json" })
+          new Blob([JSON.stringify(postDataBase)], {
+            type: "application/json",
+          })
         );
-
-        places.forEach((p) => {
+        places.forEach((p, i) => {
           if (p.imageFile) {
-            formData.append("images", p.imageFile);
+            fd.append(
+              "photos",
+              p.imageFile,
+              p.imageFile.name || `photo-${i + 1}`
+            );
+            fd.append("photoPlaceOrders", String(i + 1));
           }
         });
-
-        response = await baseApi.put(`/articles/${id}`, formData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        await baseApi.put(`/articles/${id}`, fd);
       } else {
-        // 이미지 변경이 없으면 JSON으로 전송
-        response = await baseApi.put(`/articles/${id}`, postData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+        await baseApi.put(`/articles/${id}`, postDataBase, {
+          headers: { "Content-Type": "application/json" },
         });
       }
 
       alert("게시글이 성공적으로 수정되었습니다!");
-
-      // 임시저장 데이터 삭제
       localStorage.removeItem(`tempPost_edit_${id}`);
-
-      // 수정된 게시글 상세 페이지로 이동
       navigate(`/post/${id}`);
-    } catch (error) {
-      console.error("게시글 수정 실패:", error);
-      if (error.response?.status === 403) {
-        alert("수정 권한이 없습니다.");
-      } else {
-        alert("게시글 수정에 실패했습니다. 다시 시도해주세요.");
+    } catch (err) {
+      // 호환 필드(images / imagePlaceOrders) 재시도
+      if (hasNewImages) {
+        try {
+          const fd2 = new FormData();
+          fd2.append(
+            "request",
+            new Blob([JSON.stringify(postDataBase)], {
+              type: "application/json",
+            })
+          );
+          places.forEach((p, i) => {
+            if (p.imageFile) {
+              fd2.append(
+                "images",
+                p.imageFile,
+                p.imageFile.name || `image-${i + 1}`
+              );
+              fd2.append("imagePlaceOrders", String(i + 1));
+            }
+          });
+
+          await baseApi.put(`/articles/${id}`, fd2);
+
+          alert("게시글이 성공적으로 수정되었습니다! (호환 필드 사용)");
+          localStorage.removeItem(`tempPost_edit_${id}`);
+          navigate(`/post/${id}`);
+          return;
+        } catch (err2) {
+          console.error("재시도 실패:", err2?.response?.data || err2);
+        }
       }
+
+      console.error("게시글 수정 실패:", err?.response?.data || err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "게시글 수정에 실패했습니다. 다시 시도해주세요.";
+      if (err?.response?.status === 401) {
+        alert("로그인이 필요합니다.");
+        navigate("/login");
+        return;
+      }
+      alert(msg);
     }
   };
 
+  // ========= 지도에서 장소 선택 =========
   const handleLocationClick = (index) => {
     setActivePlaceIndex(index);
-    if (mapRef.current) {
+    if (mapRef?.current) {
       mapRef.current.openSearch();
       mapRef.current.setOnSelectPlace((place) => {
         try {
-          if (!place.placeName || !place.address) {
+          if (!place.placeName || !place.address)
             throw new Error("선택한 장소에 주소 정보가 없습니다.");
-          }
-
-          const [region1, region2, ...rest] = place.address.split(" ");
-
+          const [region1, region2] = place.address.split(" ");
           const updated = [...places];
           updated[index] = {
             ...updated[index],
@@ -355,6 +385,12 @@ const PostEditPage = ({ mapRef }) => {
             },
           };
           setPlaces(updated);
+
+          const nextRegion = pickRegionFrom(
+            updated[index].roadAddress,
+            updated[index].address
+          );
+          if (nextRegion) setRegion(nextRegion);
         } catch (err) {
           console.error("주소 처리 실패:", err);
           alert(err.message);
@@ -363,20 +399,17 @@ const PostEditPage = ({ mapRef }) => {
     }
   };
 
-  // 취소 버튼
   const handleCancel = () => {
     const hasChanges =
       title !== "" ||
       tags.length > 0 ||
-      places.some((p) => p.placeName || p.description);
-
-    if (hasChanges) {
-      const confirmLeave = window.confirm(
-        "수정 중인 내용이 있습니다. 정말 나가시겠습니까?"
-      );
-      if (!confirmLeave) return;
-    }
-
+      region !== "" ||
+      places.some((p) => p.placeName || p.description || p.imageFile);
+    if (
+      hasChanges &&
+      !window.confirm("수정 중인 내용이 있습니다. 정말 나가시겠습니까?")
+    )
+      return;
     navigate(`/post/${id}`);
   };
 
@@ -403,6 +436,11 @@ const PostEditPage = ({ mapRef }) => {
           onChange={(e) => setTitle(e.target.value)}
           maxLength={100}
         />
+
+        {/* region은 UI에 노출하지 않아도 되면 숨김 */}
+        <div style={{ display: "none" }}>
+          <input value={region} onChange={(e) => setRegion(e.target.value)} />
+        </div>
 
         <div className="tag-select-container">
           {tagOptions.map((tag) => (
@@ -434,15 +472,15 @@ const PostEditPage = ({ mapRef }) => {
                 </button>
               )}
             </div>
-            <div
+
+            {/* 장소 이름 */}
+            <input
               className="place-name-input"
               maxLength={50}
               placeholder="장소 이름"
               value={place.placeName}
               onChange={(e) => handlePlaceNameChange(index, e.target.value)}
-            >
-              장소: {place.placeName}
-            </div>
+            />
 
             <button
               className="location-select-btn"
@@ -451,9 +489,12 @@ const PostEditPage = ({ mapRef }) => {
             >
               위치 등록
             </button>
+
             {place.address && (
               <div className="selected-address">주소: {place.address}</div>
             )}
+
+            {/* 이미지 업로드/미리보기 */}
             <div className="image-upload-section">
               <label
                 htmlFor={`imageUpload-${index}`}
@@ -465,6 +506,9 @@ const PostEditPage = ({ mapRef }) => {
                       src={place.image}
                       alt="미리보기"
                       className="uploaded-image"
+                      onError={() =>
+                        console.warn("이미지 로드 실패:", place.image)
+                      }
                     />
                   ) : (
                     <>
@@ -482,6 +526,7 @@ const PostEditPage = ({ mapRef }) => {
                 style={{ display: "none" }}
               />
             </div>
+
             <textarea
               className="place-description-input"
               placeholder="설명을 작성해주세요."

@@ -62,6 +62,7 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
   const location = useLocation();
   const isMyPage = location.pathname === "/mypage";
   const isCreatePage = location.pathname.includes("/create");
+  const isEditPage = location.pathname.includes("/edit"); // ✅ 추가
 
   const [showSearch, setShowSearch] = useState(false);
   const mapRef = useRef(null);
@@ -378,11 +379,11 @@ const Mapview = forwardRef(({ onSelectPlace }, ref) => {
       });
     };
     document.head.appendChild(script);
-  }, [location.pathname]);
+  }, [location.pathname, isMyPage]);
 
   return (
     <div className="map_wrap">
-      {isCreatePage && showSearch && (
+      {(isCreatePage || isEditPage) && showSearch /* ✅ 변경 */ && (
         <div id="menu_wrap" className="bg_white">
           <form id="searchForm" onSubmit={(e) => e.preventDefault()}>
             키워드: <input type="text" ref={keywordRef} size="15" />

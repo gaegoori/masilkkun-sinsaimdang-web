@@ -239,34 +239,37 @@ const ScrapbookPage = () => {
           boxSizing: "border-box",
         }}
       >
-        <div className="category-btns">
-          {["여행지", "맛집", "카페"].map((cat) => (
-            <button
-              key={cat}
-              className={`category-btn ${
-                selectedTags.includes(cat) ? "active" : ""
-              }`}
-              onClick={() => toggleTag(cat)}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="filter-chips">
+          <div className="category-btns">
+            {["여행지", "맛집", "카페"].map((cat) => (
+              <button
+                key={cat}
+                className={`category-btn ${
+                  selectedTags.includes(cat) ? "active" : ""
+                }`}
+                onClick={() => toggleTag(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* ✅ SortSelector 사용 */}
+
+          <SortSelector value={sortOrder} onChange={setSortOrder} />
         </div>
-        {/* ✅ SortSelector 사용 */}
-
-        <SortSelector value={sortOrder} onChange={setSortOrder} />
-
         {/* 리스트 */}
-      </div>
-      <div style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}>
-        <PostList
-          posts={posts}
-          region={region}
-          categories={selectedTags}
-          sortOrder={sortOrder}
-          isScrapMode={true}
-          onScrapToggle={handleScrapToggle}
-        />
+        <div
+          style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}
+        >
+          <PostList
+            posts={posts}
+            region={region}
+            categories={selectedTags}
+            sortOrder={sortOrder}
+            isScrapMode={true}
+            onScrapToggle={handleScrapToggle}
+          />
+        </div>
       </div>
     </div>
   );

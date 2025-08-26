@@ -67,12 +67,10 @@ const REGION_MAP = {
 };
 
 const ScrapbookPage = () => {
-
   const [region, setRegion] = useState(""); // ex) "서울"
   const [sortOrder, setSortOrder] = useState("기본순");
   const [posts, setPosts] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]); // CategoryFilter의 선택 결과 (배열)
-
 
   const tagMap = {
     여행지: "TRAVEL_SPOT",
@@ -95,7 +93,7 @@ const ScrapbookPage = () => {
         return;
       }
       try {
-       // --- 쿼리 파라미터 조립 ---
+        // --- 쿼리 파라미터 조립 ---
         const params = {
           page: 0,
           size: 10,
@@ -109,11 +107,7 @@ const ScrapbookPage = () => {
 
         // 지역: 서버 키가 다르면 여기서 교체 (예: params.sido = ...)
         if (region) params.region = REGION_MAP[region] || region;
-
-        const res = await baseApi.get("/user/scraps", {
-          headers: { Authorization: `Bearer ${token}` },
-          params,
-        });
+        s;
 
         // --- 응답 처리 + 클라이언트 보정 필터 ---
         const serverList =
@@ -172,7 +166,6 @@ const ScrapbookPage = () => {
         const postsData = res.data.data?.content || [];
 
         setPosts(postsData);
-
       } catch (err) {
         console.error(
           "[스크랩북] API 오류:",
@@ -184,10 +177,7 @@ const ScrapbookPage = () => {
 
     // 선택 태그/지역/정렬이 바뀔 때마다 재조회
     fetchScrapedPosts();
-
   }, [selectedTags, region, sortOrder]);
-
-
 
   const handleScrapToggle = async (articleId, isCurrentlyScraped) => {
     const token = getToken();
@@ -248,35 +238,36 @@ const ScrapbookPage = () => {
         }}
       >
         <div className="filter-chips">
-<div className="category-btns">
-          {["여행지", "맛집", "카페"].map((cat) => (
-            <button
-              key={cat}
-              className={`category-btn ${
-                selectedTags.includes(cat) ? "active" : ""
-              }`}
-              onClick={() => toggleTag(cat)}
-            >
-              {cat}
-            </button>
-          ))}
+          <div className="category-btns">
+            {["여행지", "맛집", "카페"].map((cat) => (
+              <button
+                key={cat}
+                className={`category-btn ${
+                  selectedTags.includes(cat) ? "active" : ""
+                }`}
+                onClick={() => toggleTag(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* ✅ SortSelector 사용 */}
 
-
+          <SortSelector value={sortOrder} onChange={setSortOrder} />
         </div>
-        {/* ✅ SortSelector 사용 */}
-
-        <SortSelector value={sortOrder} onChange={setSortOrder} />
-      </div>
-      {/* 리스트 */}
-      <div style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}>
-        <PostList
-          posts={posts}
-          region={region}
-           categories={selectedTags}
-          sortOrder={sortOrder}
-          isScrapMode={true}
-          onScrapToggle={handleScrapToggle}
-        />
+        {/* 리스트 */}
+        <div
+          style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}
+        >
+          <PostList
+            posts={posts}
+            region={region}
+            categories={selectedTags}
+            sortOrder={sortOrder}
+            isScrapMode={true}
+            onScrapToggle={handleScrapToggle}
+          />
+        </div>
       </div>
     </div>
   );

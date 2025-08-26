@@ -121,3 +121,9 @@
   align-items: center;
   justify-content: center;
 }
+
+.logo {
+  width: 300px;
+  height: 300px;
+  align-items: center;
+}

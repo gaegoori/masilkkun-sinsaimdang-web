@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import LoginForm from "../login/LoginForm";
 import Register from "../../pages/Register";
-
+import FindPassword from "../login/FindPassword";
 
 const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [mode, setMode] = useState("login");
@@ -15,6 +15,7 @@ const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const onRegisterSuccess = () => {
     setMode("login");
   };
+  const onPasswordReset = () => setMode("login");
 
   return (
     <Modal
@@ -22,15 +23,23 @@ const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess }) => {
       onClose={onClose}
       className={mode === "register" ? "modal-register" : "modal-default"}
     >
-      {mode === "login" ? (
+      {mode === "login" && (
         <LoginForm
           onSwitch={() => setMode("register")}
+          onFindPassword={() => setMode("findPassword")}
           onLoginSuccess={onLoginSuccess}
         />
-      ) : (
+      )}
+      {mode === "register" && (
         <Register
           onSwitch={() => setMode("login")}
           onRegisterSuccess={onRegisterSuccess}
+        />
+      )}
+      {mode === "findPassword" && (
+        <FindPassword
+          onCancel={() => setMode("login")}
+          onSuccess={onPasswordReset}
         />
       )}
     </Modal>

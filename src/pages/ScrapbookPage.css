@@ -94,3 +94,22 @@
   padding: 8px 1px;
   line-height: 36px;
 }
+
+.category-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.category-btn {
+  padding: 8px 14px;
+  border-radius: 20px;
+  background-color: #eee;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.category-btn.active {
+  background-color: #9a7937;
+  color: white;
+}

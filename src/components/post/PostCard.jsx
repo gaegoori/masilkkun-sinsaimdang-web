@@ -246,9 +246,6 @@ const PostCard = ({ post, onPatch }) => {
     RESTAURANT: "맛집",
     CAFE: "카페",
     TRAVEL: "여행지",
-    ACTIVITY: "액티비티",
-    SHOPPING: "쇼핑",
-    CULTURE: "문화",
   };
 
   const formatDate = (dateString) => {

@@ -67,15 +67,25 @@ const REGION_MAP = {
 };
 
 const ScrapbookPage = () => {
+
   const [region, setRegion] = useState(""); // ex) "서울"
   const [sortOrder, setSortOrder] = useState("기본순");
   const [posts, setPosts] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]); // CategoryFilter의 선택 결과 (배열)
 
-  const getToken = () =>
-    localStorage.getItem("accessToken") ||
-    sessionStorage.getItem("accessToken") ||
-    "";
+
+  const tagMap = {
+    여행지: "TRAVEL_SPOT",
+    맛집: "RESTAURANT",
+    카페: "CAFE",
+  };
+
+  const toggleTag = (tag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+  // 스크랩한 게시글 목록 조회
 
   useEffect(() => {
     const fetchScrapedPosts = async () => {
@@ -85,7 +95,7 @@ const ScrapbookPage = () => {
         return;
       }
       try {
-        // --- 쿼리 파라미터 조립 ---
+       // --- 쿼리 파라미터 조립 ---
         const params = {
           page: 0,
           size: 10,
@@ -118,6 +128,51 @@ const ScrapbookPage = () => {
           matchBySelectedTags(p, selectedTags)
         );
         setPosts(filtered);
+        const regionMap = {
+          서울: "서울특별시",
+          부산: "부산광역시",
+          대구: "대구광역시",
+          인천: "인천광역시",
+          광주: "광주광역시",
+          대전: "대전광역시",
+          울산: "울산광역시",
+          세종: "세종특별자치시",
+          경기: "경기도",
+          강원: "강원특별자치도",
+          충북: "충청북도",
+          충남: "충청남도",
+          전북: "전북특별자치도",
+          전남: "전라남도",
+          경북: "경상북도",
+          경남: "경상남도",
+          제주: "제주특별자치도",
+        };
+
+        const regionQuery = region ? regionMap[region] : undefined;
+        // API 엔드포인트 수정 시도
+        const tagsQuery =
+          selectedTags.length > 0
+            ? selectedTags.map((t) => tagMap[t]).join(",")
+            : undefined;
+
+        const res = await baseApi.get("user/scraps", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            page: 0,
+            size: 10,
+            sort:
+              sortOrder === "좋아요순" ? "likeCount,desc" : "createdAt,desc",
+            ...(tagsQuery && { tags: tagsQuery }),
+            ...(regionQuery && { region: regionQuery }), // tag가 있을 때만 추가
+          },
+        });
+
+        const postsData = res.data.data?.content || [];
+
+        setPosts(postsData);
+
       } catch (err) {
         console.error(
           "[스크랩북] API 오류:",
@@ -129,7 +184,10 @@ const ScrapbookPage = () => {
 
     // 선택 태그/지역/정렬이 바뀔 때마다 재조회
     fetchScrapedPosts();
+
   }, [selectedTags, region, sortOrder]);
+
+
 
   const handleScrapToggle = async (articleId, isCurrentlyScraped) => {
     const token = getToken();
@@ -167,8 +225,6 @@ const ScrapbookPage = () => {
           스크랩북
         </h3>
       </div>
-
-      {/* 지역 선택바 */}
       <div
         className="top-bar"
         style={{
@@ -178,7 +234,7 @@ const ScrapbookPage = () => {
           boxSizing: "border-box",
         }}
       >
-        <Region value={region} onChange={setRegion} />
+        <Region region={region} onChange={setRegion} />
       </div>
 
       {/* 카테고리 칩 + 정렬 */}
@@ -192,22 +248,33 @@ const ScrapbookPage = () => {
         }}
       >
         <div className="filter-chips">
-          <CategoryFilter
-            selectedCategories={selectedTags}
-            onCategoryChange={setSelectedTags}
-          />
+<div className="category-btns">
+          {["여행지", "맛집", "카페"].map((cat) => (
+            <button
+              key={cat}
+              className={`category-btn ${
+                selectedTags.includes(cat) ? "active" : ""
+              }`}
+              onClick={() => toggleTag(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+
+
         </div>
+        {/* ✅ SortSelector 사용 */}
 
         <SortSelector value={sortOrder} onChange={setSortOrder} />
       </div>
-
       {/* 리스트 */}
       <div style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}>
         <PostList
           posts={posts}
           region={region}
+           categories={selectedTags}
           sortOrder={sortOrder}
-          isScrapMode
+          isScrapMode={true}
           onScrapToggle={handleScrapToggle}
         />
       </div>

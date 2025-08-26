@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./PostCreatePage.css";
+import "./PostEditPage.css";
 import baseApi from "../api/baseApi";
 
 // 미리보기용: 상대경로 → 절대경로 보정 (이미지 표시 전용)
@@ -423,11 +424,8 @@ const PostEditPage = ({ mapRef }) => {
 
   return (
     <div className="post-create-container">
-      <div className="page-header">
-        <h3 style={{ textAlign: "center" }}>게시글 수정</h3>
-      </div>
-
       <div className="post-create-content">
+        <h3 className="edit-page-title">게시글 수정</h3>
         <input
           type="text"
           placeholder="제목을 입력해주세요."
@@ -476,7 +474,7 @@ const PostEditPage = ({ mapRef }) => {
             {/* 장소 이름 */}
             <input
               className="place-name-input"
-              maxLength={50}
+              maxLength={100}
               placeholder="장소 이름"
               value={place.placeName}
               onChange={(e) => handlePlaceNameChange(index, e.target.value)}

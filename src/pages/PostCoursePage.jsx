@@ -14,12 +14,6 @@ const TAG_LABELS = {
 
 const ACTIONS_KEY = "articleActions";
 
-const patchArticleCache = (articleId, patch) => {
-  const map = readActions();
-  map[String(articleId)] = { ...(map[String(articleId)] || {}), ...patch };
-  writeActions(map);
-};
-
 const readActions = () => {
   try {
     return JSON.parse(sessionStorage.getItem(ACTIONS_KEY) || "{}");
@@ -27,24 +21,32 @@ const readActions = () => {
     return {};
   }
 };
-
 const writeActions = (obj) => {
   try {
     sessionStorage.setItem(ACTIONS_KEY, JSON.stringify(obj));
   } catch {}
 };
+const patchArticleCache = (articleId, patch) => {
+  const map = readActions();
+  map[String(articleId)] = { ...(map[String(articleId)] || {}), ...patch };
+  writeActions(map);
+};
 
 const PostCoursePage = ({ mapRef }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [post, setPost] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [isLiked, setIsLiked] = useState(false);
   const [isScraped, setIsScraped] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [scrapCount, setScrapCount] = useState(0);
+
+  // (모달 편집 제거: isEditing/editForm는 유지해도 무방)
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "",
@@ -75,74 +77,51 @@ const PostCoursePage = ({ mapRef }) => {
       currentUser.id === post.userId);
 
   // 수정 페이지로 이동
-  const handleEditClick = () => {
-    navigate(`/edit/${id}`);
-  };
+  const handleEditClick = () => navigate(`/edit/${id}`);
 
-  // 수정 모달 닫기
+  // (모달 잔여 핸들러: 사용 안 해도 무방)
   const handleEditClose = () => {
     setIsEditing(false);
-    setEditForm({
-      title: "",
-      region: "",
-      tags: [],
-      places: [],
-    });
+    setEditForm({ title: "", region: "", tags: [], places: [] });
   };
-
-  // 게시글 수정 저장
   const handleEditSave = async () => {
     const token = ensureToken();
     if (!token) return;
-
     try {
       setLoading(true);
-
       const updateData = {
         title: editForm.title,
         region: editForm.region,
         tags: editForm.tags,
         places: editForm.places,
       };
-
       const response = await baseApi.put(`/articles/${id}`, updateData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
-
       if (response.data?.success || response.status === 200) {
         const updatedPost = response.data?.data || response.data;
-        setPost((prev) => ({
-          ...prev,
-          ...updatedPost,
-        }));
+        setPost((prev) => ({ ...prev, ...updatedPost }));
         setIsEditing(false);
         alert("게시글이 수정되었습니다.");
       }
     } catch (error) {
       console.error("게시글 수정 실패:", error);
-      if (error.response?.status === 403) {
+      if (error.response?.status === 403)
         alert("본인이 작성한 게시글만 수정할 수 있습니다.");
-      } else {
-        alert("게시글 수정에 실패했습니다.");
-      }
+      else alert("게시글 수정에 실패했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
-  // 폼 입력 핸들러
+  // 폼 입력/태그 토글 (미사용 가능)
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setEditForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setEditForm((prev) => ({ ...prev, [name]: value }));
   };
-
-  // 태그 토글 핸들러
   const handleTagToggle = (tag) => {
     setEditForm((prev) => ({
       ...prev,
@@ -152,7 +131,7 @@ const PostCoursePage = ({ mapRef }) => {
     }));
   };
 
-  // 좋아요 토글: "숫자 변화 ↔ 색" 동기화
+  // 좋아요 토글
   const handleLikeToggle = async () => {
     const token = ensureToken();
     if (!token) return;
@@ -164,7 +143,7 @@ const PostCoursePage = ({ mapRef }) => {
         });
         setLikeCount((prev) => {
           const next = Math.max(0, prev - 1);
-          setIsLiked(next > 0); // ★ 카운트에 맞춰 색 상태 동기화
+          setIsLiked(next > 0);
           patchArticleCache(id, { isLiked: next > 0, likeCount: next });
           return next;
         });
@@ -176,7 +155,7 @@ const PostCoursePage = ({ mapRef }) => {
         );
         setLikeCount((prev) => {
           const next = prev + 1;
-          setIsLiked(next > 0); // ★ 카운트에 맞춰 색 상태 동기화
+          setIsLiked(next > 0);
           patchArticleCache(id, { isLiked: next > 0, likeCount: next });
           return next;
         });
@@ -214,7 +193,7 @@ const PostCoursePage = ({ mapRef }) => {
     }
   };
 
-  // 스크랩 토글: "숫자 변화 ↔ 색" 동기화
+  // 스크랩 토글
   const handleScrapToggle = async () => {
     const token = ensureToken();
     if (!token) return;
@@ -226,12 +205,11 @@ const PostCoursePage = ({ mapRef }) => {
         });
         setScrapCount((prev) => {
           const next = Math.max(0, prev - 1);
-          setIsScraped(next > 0); // ★ 카운트에 맞춰 색 상태 동기화
+          setIsScraped(next > 0);
           patchArticleCache(id, { isScraped: next > 0, scrapCount: next });
           return next;
         });
       } else {
-        // 서버별 payload 요구 대응
         try {
           await baseApi.post(
             `articles/${id}/scraps`,
@@ -250,7 +228,7 @@ const PostCoursePage = ({ mapRef }) => {
         }
         setScrapCount((prev) => {
           const next = prev + 1;
-          setIsScraped(next > 0); // ★ 카운트에 맞춰 색 상태 동기화
+          setIsScraped(next > 0);
           patchArticleCache(id, { isScraped: next > 0, scrapCount: next });
           return next;
         });
@@ -264,7 +242,6 @@ const PostCoursePage = ({ mapRef }) => {
         return;
       }
       if (status === 400) {
-        // 상태 불일치 보정
         if (!isScraped && /이미\s*스크랩/i.test(message)) {
           try {
             await baseApi.delete(`articles/${id}/scraps`, {
@@ -322,7 +299,6 @@ const PostCoursePage = ({ mapRef }) => {
           localStorage.getItem("accessToken");
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        // 게시글과 사용자 정보를 동시에 로드
         const [postResponse, userResponse] = await Promise.all([
           baseApi.get(`articles/${id}`, { headers }),
           token
@@ -332,10 +308,7 @@ const PostCoursePage = ({ mapRef }) => {
 
         const postData = postResponse.data?.data;
         const userData = userResponse?.data?.data || userResponse?.data;
-
-        if (userData) {
-          setCurrentUser(userData);
-        }
+        if (userData) setCurrentUser(userData);
 
         const like0 = Number(postData?.likeCount || 0);
         const scrap0 = Number(postData?.scrapCount || 0);
@@ -349,7 +322,6 @@ const PostCoursePage = ({ mapRef }) => {
           typeof postData?.isScraped === "boolean" ? scraped0 : scrap0 > 0
         );
 
-        // 캐시 저장
         patchArticleCache(id, {
           isLiked: typeof postData?.isLiked === "boolean" ? liked0 : like0 > 0,
           isScraped:
@@ -364,7 +336,7 @@ const PostCoursePage = ({ mapRef }) => {
             postData.places.map(async (p) => {
               if (!p.address) return p;
               const geocoder = new window.kakao.maps.services.Geocoder();
-              return new Promise((resolve, reject) => {
+              return new Promise((resolve) => {
                 geocoder.addressSearch(p.address, (result, status) => {
                   if (status === window.kakao.maps.services.Status.OK) {
                     const { y: lat, x: lng } = result[0];
@@ -373,7 +345,7 @@ const PostCoursePage = ({ mapRef }) => {
                       lat: parseFloat(lat),
                       lng: parseFloat(lng),
                     });
-                  } else resolve(p); // 주소 변환 실패 시 원래 데이터 유지
+                  } else resolve(p);
                 });
               });
             })
@@ -382,7 +354,6 @@ const PostCoursePage = ({ mapRef }) => {
 
         setPost({ ...postData, places: placesWithCoords });
 
-        // Mapview 준비될 때까지 대기 후 길찾기 호출
         if (placesWithCoords?.length && mapRef?.current?.getRoute) {
           await mapRef.current.getRoute(placesWithCoords);
         }
@@ -407,7 +378,11 @@ const PostCoursePage = ({ mapRef }) => {
 
   return (
     <div className="post-course-page">
-      <button className="back-button" onClick={handleGoBack}>
+      <button
+        className="back-button"
+        onClick={handleGoBack}
+        aria-label="뒤로 가기"
+      >
         <FaArrowLeft />
       </button>
 
@@ -434,12 +409,12 @@ const PostCoursePage = ({ mapRef }) => {
         </div>
       </div>
 
-      {/* 태그와 수정 버튼 영역 */}
+      {/* 태그와 수정 버튼 영역 (오른쪽에 연필 버튼) */}
       <div className="tags-section">
         <div className="tags">
           {post.tags?.map((tag, i) => {
-            const value = tag.replace(/^#/, ""); // '#' 있으면 제거
-            const label = TAG_LABELS[value] || value; // 매핑 없으면 원래 값
+            const value = typeof tag === "string" ? tag.replace(/^#/, "") : tag;
+            const label = TAG_LABELS[value] || value;
             return (
               <button key={i} className="tag-btn">
                 #{label}
@@ -448,12 +423,12 @@ const PostCoursePage = ({ mapRef }) => {
           })}
         </div>
 
-        {/* 수정 버튼 - 작성자에게만 표시 */}
         {isAuthor && (
           <button
             className="edit-btn-small"
             onClick={handleEditClick}
             title="게시글 수정"
+            aria-label="게시글 수정"
           >
             수정
           </button>
@@ -480,22 +455,19 @@ const PostCoursePage = ({ mapRef }) => {
               {place.placeName}
             </div>
             <div className="detail-sub">{place.address}</div>
-            {/* 🔹 place.photoUrl 사용 */}
             <img
               className="detail-img"
               src={place.photoUrl || "/default-image.png"}
               alt={`${place.placeName} 이미지`}
               onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "/default-image.png";
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/default-image.png";
               }}
             />
             <div className="detail-text">{place.description}</div>
           </div>
         ))}
       </div>
-
-      {/* 수정 모달 제거 - 이제 별도 페이지로 이동 */}
 
       <Mapview ref={mapRef} />
     </div>

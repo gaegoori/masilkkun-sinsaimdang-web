@@ -137,11 +137,25 @@
   transform: scale(1.2);
 }
 
+/* ▼▼▼ 추가: 태그 + 수정버튼 한 줄 배치 컨테이너 ▼▼▼ */
+.tags-section {
+  /* 추가 */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px; /* 기존 .tags의 margin-bottom을 여기로 이관 */
+}
+/* ▲▲▲ 추가 끝 ▲▲▲ */
+
 .tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 28px;
+  /* 수정: 태그 줄의 외부 여백은 .tags-section이 담당하도록 0으로 변경 */
+  margin-bottom: 0; /* 변경(기존 28px) */
+  /* 추가: 오른쪽 버튼이 끝으로 밀리도록 안쪽 태그 컨테이너가 공간 차지 */
+  flex: 1; /* 추가 */
+  min-width: 0; /* 추가: 줄바꿈 안정화 */
 }
 
 .tag-btn {
@@ -153,6 +167,38 @@
   color: #5d4636;
   font-weight: 500;
 }
+
+/* ▼▼▼ 추가: 태그 라인 오른쪽 '수정하기(연필)' 버튼 스타일 ▼▼▼ */
+.edit-btn-small {
+  /* 추가 */
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  color: #5d4636; /* 톤을 태그/포인트 컬러(#5d4636, #c6aa7f)와 맞춤 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: auto; /* 오른쪽 끝 정렬 핵심 */
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.edit-btn-small:hover {
+  /* 추가 */
+  background-color: #f8f8f8;
+  transform: translateY(-1px);
+}
+.edit-btn-small:active {
+  /* 추가 */
+  transform: translateY(0);
+}
+.edit-btn-small svg {
+  /* 추가 */
+  width: 18px;
+  height: 18px;
+}
+/* ▲▲▲ 추가 끝 ▲▲▲ */
 
 .course-summary {
   border-top: 1px solid #f0f0f0;
@@ -238,6 +284,7 @@
   color: #444;
   white-space: pre-line;
 }
+
 /* PostCoursePage.css */
 .post-course-page > .map_wrap {
   display: none !important;

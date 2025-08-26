@@ -6,6 +6,7 @@ import baseApi from "../api/baseApi";
 import "./ScrapbookPage.css";
 import CategoryFilter from "../components/post/CategoryFilter";
 
+
 const ScrapbookPage = () => {
   const [region, setRegion] = useState("");
   const [sortOrder, setSortOrder] = useState("기본순");
@@ -18,11 +19,6 @@ const ScrapbookPage = () => {
     카페: "CAFE",
   };
 
-  const toggleTag = (tag) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
   // 스크랩한 게시글 목록 조회
   useEffect(() => {
     const fetchScrapedPosts = async () => {
@@ -167,7 +163,6 @@ const ScrapbookPage = () => {
             <option value="좋아요순">좋아요순</option>
           </select>
         </div>
-      </div>
 
       <PostList
         posts={posts}

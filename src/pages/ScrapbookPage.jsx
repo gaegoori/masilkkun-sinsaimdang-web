@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import Region from "../components/layout/Region";
 import PostList from "../components/post/PostList";
-import CategoryFilter from "../components/post/CategoryFilter";
 import SortSelector from "../components/post/SortSelector";
 import baseApi from "../api/baseApi";
 import "./ScrapbookPage.css";
@@ -31,12 +30,12 @@ function normalizePostTags(post) {
     .filter(Boolean);
 }
 
-// 선택된 태그(AND 조건)로 필터
+// 선택된 태그(AND 조건)로 필터 (selected는 한글 문자열 배열)
 function matchBySelectedTags(post, selected) {
   if (!selected || selected.length === 0) return true;
-  const postTags = normalizePostTags(post);
+  const postTags = normalizePostTags(post); // => ["TRAVEL_SPOT", ...]
   if (postTags.length === 0) return false;
-  const want = new Set(selected.map((s) => s.value));
+  const want = new Set(selected.map((s) => K2E[s] || s)); // 한글 → 코드
   for (const v of want) if (!postTags.includes(v)) return false;
   return true;
 }
@@ -67,60 +66,45 @@ const REGION_MAP = {
 };
 
 const ScrapbookPage = () => {
-
   const [region, setRegion] = useState(""); // ex) "서울"
   const [sortOrder, setSortOrder] = useState("기본순");
   const [posts, setPosts] = useState([]);
-  const [selectedTags, setSelectedTags] = useState([]); // CategoryFilter의 선택 결과 (배열)
-
-
-  const tagMap = {
-    여행지: "TRAVEL_SPOT",
-    맛집: "RESTAURANT",
-    카페: "CAFE",
-  };
+  const [selectedTags, setSelectedTags] = useState([]); // ["여행지","맛집",...]
 
   const toggleTag = (tag) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
-  // 스크랩한 게시글 목록 조회
 
+  // 스크랩한 게시글 목록 조회
   useEffect(() => {
     const fetchScrapedPosts = async () => {
-      const token = getToken();
-      if (!token) {
-        console.log("로그인이 필요합니다.");
-        return;
-      }
       try {
-       // --- 쿼리 파라미터 조립 ---
+        // --- 쿼리 파라미터 조립 ---
         const params = {
           page: 0,
           size: 10,
           sort: SORT_MAP[sortOrder] || "createdAt,desc",
         };
 
-        // 태그: 1개면 tag, 여러개면 tags(콤마) — 서버가 읽는 포맷 아무거나 한 개만 써도 됨
-        const tagValues = selectedTags.map((t) => t.value).filter(Boolean);
+        // 태그: 한글 → 코드로 변환
+        const tagValues = selectedTags.map((k) => K2E[k]).filter(Boolean);
         if (tagValues.length === 1) params.tag = tagValues[0];
         else if (tagValues.length > 1) params.tags = tagValues.join(",");
 
-        // 지역: 서버 키가 다르면 여기서 교체 (예: params.sido = ...)
+        // 지역 매핑
         if (region) params.region = REGION_MAP[region] || region;
 
-        const res = await baseApi.get("/user/scraps", {
-          headers: { Authorization: `Bearer ${token}` },
-          params,
-        });
+        // ✅ 한 번만 호출 (중복 선언 제거), 앞에 슬래시 포함
+        const resp = await baseApi.get("/user/scraps", { params });
 
         // --- 응답 처리 + 클라이언트 보정 필터 ---
         const serverList =
-          res.data?.data?.content ??
-          res.data?.content ??
-          res.data?.data ??
-          res.data ??
+          resp.data?.data?.content ??
+          resp.data?.content ??
+          resp.data?.data ??
+          resp.data ??
           [];
 
         const arr = Array.isArray(serverList) ? serverList : [];
@@ -128,86 +112,27 @@ const ScrapbookPage = () => {
           matchBySelectedTags(p, selectedTags)
         );
         setPosts(filtered);
-        const regionMap = {
-          서울: "서울특별시",
-          부산: "부산광역시",
-          대구: "대구광역시",
-          인천: "인천광역시",
-          광주: "광주광역시",
-          대전: "대전광역시",
-          울산: "울산광역시",
-          세종: "세종특별자치시",
-          경기: "경기도",
-          강원: "강원특별자치도",
-          충북: "충청북도",
-          충남: "충청남도",
-          전북: "전북특별자치도",
-          전남: "전라남도",
-          경북: "경상북도",
-          경남: "경상남도",
-          제주: "제주특별자치도",
-        };
-
-        const regionQuery = region ? regionMap[region] : undefined;
-        // API 엔드포인트 수정 시도
-        const tagsQuery =
-          selectedTags.length > 0
-            ? selectedTags.map((t) => tagMap[t]).join(",")
-            : undefined;
-
-        const res = await baseApi.get("user/scraps", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          params: {
-            page: 0,
-            size: 10,
-            sort:
-              sortOrder === "좋아요순" ? "likeCount,desc" : "createdAt,desc",
-            ...(tagsQuery && { tags: tagsQuery }),
-            ...(regionQuery && { region: regionQuery }), // tag가 있을 때만 추가
-          },
-        });
-
-        const postsData = res.data.data?.content || [];
-
-        setPosts(postsData);
-
       } catch (err) {
         console.error(
           "[스크랩북] API 오류:",
           err.response?.status,
           err.message
         );
+        setPosts([]);
       }
     };
 
-    // 선택 태그/지역/정렬이 바뀔 때마다 재조회
     fetchScrapedPosts();
-
   }, [selectedTags, region, sortOrder]);
 
-
-
   const handleScrapToggle = async (articleId, isCurrentlyScraped) => {
-    const token = getToken();
-    if (!token) {
-      alert("로그인이 필요합니다.");
-      return;
-    }
     try {
       if (isCurrentlyScraped) {
-        await baseApi.delete(`/articles/${articleId}/scraps`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await baseApi.delete(`/articles/${articleId}/scraps`);
         setPosts((prev) => prev.filter((p) => p.id !== articleId));
         alert("스크랩이 취소되었습니다.");
       } else {
-        await baseApi.post(
-          `/articles/${articleId}/scraps`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await baseApi.post(`/articles/${articleId}/scraps`, {});
         alert("스크랩에 추가되었습니다.");
       }
     } catch (err) {
@@ -225,6 +150,7 @@ const ScrapbookPage = () => {
           스크랩북
         </h3>
       </div>
+
       <div
         className="top-bar"
         style={{
@@ -248,31 +174,31 @@ const ScrapbookPage = () => {
         }}
       >
         <div className="filter-chips">
-<div className="category-btns">
-          {["여행지", "맛집", "카페"].map((cat) => (
-            <button
-              key={cat}
-              className={`category-btn ${
-                selectedTags.includes(cat) ? "active" : ""
-              }`}
-              onClick={() => toggleTag(cat)}
-            >
-              {cat}
-            </button>
-          ))}
+          <div className="category-btns">
+            {["여행지", "맛집", "카페"].map((cat) => (
+              <button
+                key={cat}
+                className={`category-btn ${
+                  selectedTags.includes(cat) ? "active" : ""
+                }`}
+                onClick={() => toggleTag(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
-
+          {/* 정렬 */}
+          <SortSelector value={sortOrder} onChange={setSortOrder} />
         </div>
-        {/* ✅ SortSelector 사용 */}
-
-        <SortSelector value={sortOrder} onChange={setSortOrder} />
       </div>
+
       {/* 리스트 */}
       <div style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}>
         <PostList
           posts={posts}
           region={region}
-           categories={selectedTags}
+          categories={selectedTags}
           sortOrder={sortOrder}
           isScrapMode={true}
           onScrapToggle={handleScrapToggle}

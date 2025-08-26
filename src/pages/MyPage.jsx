@@ -316,27 +316,78 @@ export default function MyPage() {
       return;
     }
 
-    const confirmDelete = window.confirm(
-      `선택한 ${selectedPosts.size}개의 게시글을 정말 삭제하시겠습니까?`
-    );
+    const ids = Array.from(selectedPosts);
+    if (
+      !window.confirm(
+        `선택한 ${ids.length}개의 게시글을 정말 삭제하시겠습니까?`
+      )
+    )
+      return;
 
-    if (!confirmDelete) return;
+    setLoading(true);
+    setError(null);
 
+    // 한 번에 3개씩만 병렬 삭제
+    const CONCURRENCY = 3;
+
+    const deleteOne = async (id) => {
+      const candidates = [
+        `/articles/${id}`,
+        `/posts/${id}`,
+        `/user/me/articles/${id}`,
+        `/user/${user?.id}/articles/${id}`,
+        `/user/${user?.id}/posts/${id}`,
+      ];
+      for (const url of candidates) {
+        try {
+          const res = await baseApi.delete(url);
+          if (res.status === 200 || res.status === 204 || res.data?.success)
+            return true;
+        } catch (_) {
+          /* 다음 후보 시도 */
+        }
+      }
+      return false;
+    };
+
+    const results = [];
     try {
-      setLoading(true);
-      setError(null);
+      for (let i = 0; i < ids.length; i += CONCURRENCY) {
+        const slice = ids.slice(i, i + CONCURRENCY);
+        const settled = await Promise.allSettled(slice.map(deleteOne));
+        settled.forEach((r, idx) => {
+          results.push({
+            id: slice[idx],
+            ok: r.status === "fulfilled" && r.value === true,
+          });
+        });
+      }
 
-      // 현재는 서버 문제로 삭제 불가 안내
-      setError(
-        `⚠️ 현재 서버에 문제가 있어 게시글 삭제 기능을 사용할 수 없습니다.\n\n` +
-          `개발팀에서 해결 중이니 잠시 후 다시 시도해주세요.`
-      );
+      const succeeded = new Set(results.filter((r) => r.ok).map((r) => r.id));
+      const failed = results.filter((r) => !r.ok).map((r) => r.id);
 
+      if (succeeded.size > 0) {
+        setPosts((prev) => prev.filter((p) => !succeeded.has(p.id)));
+      }
       setSelectedPosts(new Set());
       setIsDeleteMode(false);
+
+      if (failed.length > 0) {
+        setError(`${failed.length}개 삭제 실패: ${failed.join(", ")}`);
+      }
     } catch (e) {
-      console.error("게시글 삭제 실패:", e);
-      setError("현재 서버 문제로 게시글 삭제가 불가능합니다.");
+      const status = e?.response?.status;
+      setError(
+        status === 401
+          ? "로그인이 필요합니다."
+          : status === 403
+          ? "본인 게시글만 삭제할 수 있습니다."
+          : status === 404
+          ? "삭제 대상 게시글을 찾을 수 없습니다."
+          : status === 500
+          ? "서버 오류로 삭제에 실패했습니다. 잠시 후 다시 시도해주세요."
+          : e?.message || "삭제 중 알 수 없는 오류가 발생했습니다."
+      );
     } finally {
       setLoading(false);
     }

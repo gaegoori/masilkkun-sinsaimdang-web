@@ -69,7 +69,18 @@ const ScrapbookPage = () => {
   const [region, setRegion] = useState(""); // ex) "서울"
   const [sortOrder, setSortOrder] = useState("기본순");
   const [posts, setPosts] = useState([]);
-  const [selectedTags, setSelectedTags] = useState([]); // ["여행지","맛집",...]
+
+  const [selectedTags, setSelectedTags] = useState([]); // CategoryFilter의 선택 결과 (배열)
+
+  const tagMap = {
+    여행지: "TRAVEL_SPOT",
+    맛집: "RESTAURANT",
+    카페: "CAFE",
+  };
+  const getToken = () =>
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken") ||
+    "";
 
   const toggleTag = (tag) => {
     setSelectedTags((prev) =>
@@ -96,8 +107,10 @@ const ScrapbookPage = () => {
         // 지역 매핑
         if (region) params.region = REGION_MAP[region] || region;
 
+
         // ✅ 한 번만 호출 (중복 선언 제거), 앞에 슬래시 포함
         const resp = await baseApi.get("/user/scraps", { params });
+
 
         // --- 응답 처리 + 클라이언트 보정 필터 ---
         const serverList =
@@ -112,6 +125,52 @@ const ScrapbookPage = () => {
           matchBySelectedTags(p, selectedTags)
         );
         setPosts(filtered);
+
+        const regionMap = {
+          서울: "서울특별시",
+          부산: "부산광역시",
+          대구: "대구광역시",
+          인천: "인천광역시",
+          광주: "광주광역시",
+          대전: "대전광역시",
+          울산: "울산광역시",
+          세종: "세종특별자치시",
+          경기: "경기도",
+          강원: "강원특별자치도",
+          충북: "충청북도",
+          충남: "충청남도",
+          전북: "전북특별자치도",
+          전남: "전라남도",
+          경북: "경상북도",
+          경남: "경상남도",
+          제주: "제주특별자치도",
+        };
+
+        const regionQuery = region ? regionMap[region] : undefined;
+        // API 엔드포인트 수정 시도
+        const tagsQuery =
+          selectedTags.length > 0
+            ? selectedTags.map((t) => tagMap[t]).join(",")
+            : undefined;
+
+        const res = await baseApi.get("user/scraps", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            page: 0,
+            size: 10,
+            sort:
+              sortOrder === "좋아요순" ? "likeCount,desc" : "createdAt,desc",
+            ...(tagsQuery && { tags: tagsQuery }),
+            ...(regionQuery && { region: regionQuery }), // tag가 있을 때만 추가
+          },
+        });
+
+        const postsData = res.data.data?.content || [];
+
+        setPosts(postsData);
+
       } catch (err) {
         console.error(
           "[스크랩북] API 오류:",
@@ -188,6 +247,7 @@ const ScrapbookPage = () => {
             ))}
           </div>
 
+
           {/* 정렬 */}
           <SortSelector value={sortOrder} onChange={setSortOrder} />
         </div>
@@ -203,6 +263,8 @@ const ScrapbookPage = () => {
           isScrapMode={true}
           onScrapToggle={handleScrapToggle}
         />
+
+          
       </div>
     </div>
   );

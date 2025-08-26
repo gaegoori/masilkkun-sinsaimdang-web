@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import baseApi from "../../api/baseApi";
 
-const LoginForm = ({ onSwitch, onLoginSuccess }) => {
+const LoginForm = ({ onSwitch, onLoginSuccess, onFindPassword }) => {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false); // 로그인 유지
@@ -127,10 +127,9 @@ const LoginForm = ({ onSwitch, onLoginSuccess }) => {
               className="pla-button"
               role="button"
               tabIndex={0}
-              onClick={() => {}}
-              onKeyDown={(e) => e.key === "Enter" && onSwitch()}
+              onClick={onFindPassword}
             >
-              아이디/비밀번호 찾기
+              비밀번호 찾기
             </span>
 
             <span

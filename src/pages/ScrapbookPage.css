@@ -49,7 +49,6 @@
   align-items: center;
   padding: 0 8px;
   gap: 8px;
-  padding-right: 12px;
   flex-wrap: nowrap;
 }
 
@@ -91,8 +90,6 @@
   min-height: 32px;
   display: flex;
   align-items: center;
-  padding: 8px 1px;
-  line-height: 36px;
 }
 
 .category-btns {

@@ -62,10 +62,6 @@ export const getRoute = async (routePlaces) => {
 const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
   const routeMarkersRef = useRef([]);
   const location = useLocation();
-
-  const isMyPage = location.pathname === "/mypage";
-  const isCreatePage = location.pathname.includes("/create");
-  const isEditPage = location.pathname.includes("/edit"); // ✅ 추가
   const [showSearch, setShowSearch] = useState(false);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -343,7 +339,6 @@ const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
       const res = await baseApi.get("/location/stamp/map", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log("백에서 받아온 스탬프 데이터:", res.data?.data);
       return res.data?.data || [];
     } catch (err) {
       console.error("스탬프 데이터 불러오기 실패:", err);
@@ -512,13 +507,11 @@ const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
       });
     };
     document.head.appendChild(script);
-
-  }, [location.pathname, isMyPage]);
+  }, [location.pathname, mode]);
 
   return (
     <div className="map_wrap">
-      {(isCreatePage || isEditPage) && showSearch /* ✅ 변경 */ && (
-
+      {pageMode === "create" && showSearch && (
         <div id="menu_wrap" className="bg_white">
           <form id="searchForm" onSubmit={(e) => e.preventDefault()}>
             키워드: <input type="text" ref={keywordRef} size="15" />

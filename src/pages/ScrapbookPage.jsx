@@ -77,7 +77,10 @@ const ScrapbookPage = () => {
     맛집: "RESTAURANT",
     카페: "CAFE",
   };
-
+  const getToken = () =>
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken") ||
+    "";
   const toggleTag = (tag) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
@@ -107,7 +110,6 @@ const ScrapbookPage = () => {
 
         // 지역: 서버 키가 다르면 여기서 교체 (예: params.sido = ...)
         if (region) params.region = REGION_MAP[region] || region;
-        s;
 
         // --- 응답 처리 + 클라이언트 보정 필터 ---
         const serverList =
@@ -237,37 +239,34 @@ const ScrapbookPage = () => {
           boxSizing: "border-box",
         }}
       >
-        <div className="filter-chips">
-          <div className="category-btns">
-            {["여행지", "맛집", "카페"].map((cat) => (
-              <button
-                key={cat}
-                className={`category-btn ${
-                  selectedTags.includes(cat) ? "active" : ""
-                }`}
-                onClick={() => toggleTag(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-          {/* ✅ SortSelector 사용 */}
+        <div className="category-btns">
+          {["여행지", "맛집", "카페"].map((cat) => (
+            <button
+              key={cat}
+              className={`category-btn ${
+                selectedTags.includes(cat) ? "active" : ""
+              }`}
+              onClick={() => toggleTag(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        {/* ✅ SortSelector 사용 */}
 
-          <SortSelector value={sortOrder} onChange={setSortOrder} />
-        </div>
+        <SortSelector value={sortOrder} onChange={setSortOrder} />
+
         {/* 리스트 */}
-        <div
-          style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}
-        >
-          <PostList
-            posts={posts}
-            region={region}
-            categories={selectedTags}
-            sortOrder={sortOrder}
-            isScrapMode={true}
-            onScrapToggle={handleScrapToggle}
-          />
-        </div>
+      </div>
+      <div style={{ width: `min(100%, ${CONTENT_WIDTH}px)`, margin: "0 auto" }}>
+        <PostList
+          posts={posts}
+          region={region}
+          categories={selectedTags}
+          sortOrder={sortOrder}
+          isScrapMode={true}
+          onScrapToggle={handleScrapToggle}
+        />
       </div>
     </div>
   );

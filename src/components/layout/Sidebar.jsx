@@ -70,7 +70,6 @@ const Sidebar = ({ isLoggedIn, setIsLoggedIn, setIsLoginModalOpen }) => {
           },
         });
         setUser(res.data.data || res.data); // API 응답 구조에 따라 조정
-
       } catch (err) {
         console.error("유저 정보 요청 실패:", err);
         if (err.response?.status === 401 || err.response?.status === 403) {
@@ -172,12 +171,12 @@ const Sidebar = ({ isLoggedIn, setIsLoggedIn, setIsLoginModalOpen }) => {
                 user?.profileImageUrl ||
                 user?.profileImage ||
                 user?.profile_image ||
-                "/default-profile.png"
+                "./default_profile.png"
               }
               alt="프로필"
               className="sidebar-profile-img"
               onError={(e) => {
-                e.target.src = "/default-profile.png";
+                e.target.src = "./default_profile.png";
               }}
               // 🎯 이미지 비율 유지를 위한 스타일 추가
               style={{
@@ -193,8 +192,7 @@ const Sidebar = ({ isLoggedIn, setIsLoggedIn, setIsLoginModalOpen }) => {
         ) : (
           <div className="profile-box">
             <img
-              src="/default-profile.png"
-              alt="기본 프로필"
+              src="./default_profile.png"
               className="sidebar-profile-img"
               style={{
                 width: "60px",
